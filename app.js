@@ -922,6 +922,7 @@ class PKMApp {
                     <li>Backlinks panel shows which notes link to the current note</li>
                     <li>Broken links are highlighted differently from valid links</li>
                     <li>Create new notes directly from broken links</li>
+                    <li><b>WARNING</b>: If you change a note name, existing wikilinks to that note will break</li>
                 </ul>
                 
                 <h4>Multi-Pane Interface</h4>
