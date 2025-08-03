@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PKM Notes</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <div class="logo">📝 PKM WebNotes</div>
+
+            <input type="text" class="search-input" placeholder="Search notes..." id="searchInput">
+            <div class="header-actions">
+                <button class="btn" id="themeBtn">🌓</button>
+                <button class="btn" id="importBtn">Import</button>
+                <button class="btn" id="exportBtn">Export</button>
+                <button class="btn btn-primary" id="newNoteBtn">+ New Note</button>
+            </div>
+            <p align="right">A home cooked app by <a href="https://shawngraham.github.io">S.M. Graham</a></p>
+        </header>
+
+        <main class="main">
+    <aside class="sidebar">
+        <div class="sidebar-header">All Notes</div>
+        <div class="note-list" id="noteList"></div>
+    </aside>
+
+    <!--
+      Correct Structure:
+      1. A wrapper div that is the grid item.
+    -->
+    <div class="editor-area">
+      <!--
+        2. Inside it, the ONE container that will scroll.
+           Your app.js will add/remove notes from here.
+      -->
+      <div class="editor-panes-container" id="editorPanesContainer">
+        <div class="empty-state">
+          <h3>Welcome to PKM Notes</h3>
+          <p>Select a note from the sidebar or create a new one to get started.</p>
+        </div>
+      </div>
+    </div>
+
+    <aside class="right-sidebar" id="rightSidebar">
+        <div class="right-sidebar-content">
+             <div class="empty-sidebar">
+                <p>No note selected.</p>
+            </div>
+        </div>
+    </aside>
+</main>
+    </div>
+
+    <input type="file" id="fileInput" multiple accept=".md,.txt" class="hidden">
+
+    <script src="utils.js"></script>
+    <script src="note.js"></script>
+    <script src="backlinks.js"></script>
+    <script src="autocomplete.js"></script>
+    <script src="graph.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
