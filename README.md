@@ -177,3 +177,5 @@ This project is open source. Feel free to modify and distribute as needed.
 ## Credits
 
 Created by S.M. Graham as a simple, self-contained personal knowledge management tool. Developed by carefully spec'ing out each element and then writing/transforming my natural language into code with Claude.
+
+Aug 3 2025
