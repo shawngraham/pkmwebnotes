@@ -897,146 +897,147 @@ class PKMApp {
         const modal = document.createElement('div');
         modal.className = 'welcome-modal';
         modal.innerHTML = `
-            <div class="welcome-modal-content">
-                <div class="welcome-header">
-                    <h2>Welcome to PKM WebNotes! 📝</h2>
-                    <button class="welcome-close-btn">×</button>
-                </div>
-                <div class="welcome-body">
-                    <h3>Features</h3>
-                    
-                    <h4>Note Management</h4>
-                    <ul>
-                        <li>Create and edit notes with markdown support</li>
-                        <li>Notes automatically save as you type</li>
-                        <li>Real-time preview with syntax highlighting</li>
-                        <li>Search through all notes by title or content</li>
-                        <li>Notes are sorted by most recently modified</li>
-                    </ul>
-                    
-                    <h4>Linking System</h4>
-                    <ul>
-                        <li>Create wiki-style links between notes using <code>[[Note Title]]</code> syntax</li>
-                        <li>Autocomplete suggestions when typing links</li>
-                        <li>Backlinks panel shows which notes link to the current note</li>
-                        <li>Broken links are highlighted differently from valid links</li>
-                        <li>Create new notes directly from broken links</li>
-                    </ul>
-                    
-                    <h4>Multi-Pane Interface</h4>
-                    <ul>
-                        <li>Open multiple notes simultaneously in separate panes</li>
-                        <li>Split view modes: Edit only, Preview only, or Split (edit and preview side-by-side)</li>
-                        <li>Click any pane to focus it</li>
-                        <li>Close individual panes with the X button</li>
-                        <li>Right sidebar shows information for the currently focused note</li>
-                    </ul>
-                    
-                    <h4>Import and Export</h4>
-                    <ul>
-                        <li>Import markdown (.md) and text (.txt) files</li>
-                        <li>Export options:
-                            <ul>
-                                <li>JSON format (complete backup with metadata)</li>
-                                <li>Individual markdown files</li>
-                                <li>Single combined markdown file</li>
-                            </ul>
-                        </li>
-                        <li>Preserve frontmatter and metadata during import/export</li>
-                    </ul>
-                    
-                    <h4>Wikilink Connection Graph Export</h4>
-                    <ul>
-                        <li>Export as nodes and edges CSV describing the interconnections in your notes</li>
-                        <li>Network statistics calculated include <strong>Betweenness Centrality</strong> and <strong>Community Detection</strong></li>
-                        <li><strong>What This Reveals About Your Notes:</strong>
-                            <ul>
-                                <li>High betweenness centrality notes = Your most important conceptual bridges</li>
-                                <li>Communities = Natural topic clusters in your knowledge</li>
-                                <li>Modularity score = How well-separated your topics are</li>
-                            </ul>
-                        </li>
-                    </ul>
-                    
-                    <h4>Themes</h4>
-                    <ul>
-                        <li>Light and dark theme support</li>
-                        <li>Theme preference is saved automatically</li>
-                    </ul>
-                    
-                    <h3>Getting Started</h3>
-                    <ol>
-                        <li>Click "New Note" to create your first note</li>
-                        <li>Start writing in markdown format</li>
-                        <li>Use <code>[[Note Title]]</code> to link to other notes</li>
-                        <li>Right-click on notes in the sidebar for additional options</li>
-                        <li>You can create new notes by writing a wikilink to a non-existing note; before you get to the final ]], autocomplete will ask if you wish to create that note. Click on that modal to create!</li>
-                    </ol>
-                    
-                    <h3>Block Embeds</h3>
-                    <p>If you want to embed blocks from one note in another, you have to give the block an id. To test this, create a note:</p>
-                    
-                    <pre><code># Source Note
+       <div class="welcome-overlay"></div>
+        <div class="welcome-modal-content">
+            <div class="welcome-header">
+                <h2>Welcome to PKM WebNotes! 📝</h2>
+                <button class="welcome-close-btn">×</button>
+            </div>
+            <div class="welcome-body">
+                <h3>Features</h3>
+                
+                <h4>Note Management</h4>
+                <ul>
+                    <li>Create and edit notes with markdown support</li>
+                    <li>Notes automatically save as you type</li>
+                    <li>Real-time preview with syntax highlighting</li>
+                    <li>Search through all notes by title or content</li>
+                    <li>Notes are sorted by most recently modified</li>
+                </ul>
+                
+                <h4>Linking System</h4>
+                <ul>
+                    <li>Create wiki-style links between notes using <code>[[Note Title]]</code> syntax</li>
+                    <li>Autocomplete suggestions when typing links</li>
+                    <li>Backlinks panel shows which notes link to the current note</li>
+                    <li>Broken links are highlighted differently from valid links</li>
+                    <li>Create new notes directly from broken links</li>
+                </ul>
+                
+                <h4>Multi-Pane Interface</h4>
+                <ul>
+                    <li>Open multiple notes simultaneously in separate panes</li>
+                    <li>Split view modes: Edit only, Preview only, or Split (edit and preview side-by-side)</li>
+                    <li>Click any pane to focus it</li>
+                    <li>Close individual panes with the X button</li>
+                    <li>Right-click a note in the note list to open in a new pane; use horizontal scroll bar if necessary!</li>
+                    <li>Right sidebar shows information for the currently focused note</li>
+                </ul>
+                
+                <h4>Import and Export</h4>
+                <ul>
+                    <li>Import markdown (.md) and text (.txt) files</li>
+                    <li>Export options:
+                        <ul>
+                            <li>JSON format (complete backup with metadata)</li>
+                            <li>Individual markdown files</li>
+                            <li>Single combined markdown file</li>
+                        </ul>
+                    </li>
+                    <li>Preserve frontmatter and metadata during import/export</li>
+                </ul>
+                
+                <h4>Wikilink Connection Graph Export</h4>
+                <ul>
+                    <li>Export as nodes and edges CSV describing the interconnections in your notes</li>
+                    <li>Network statistics calculated include <strong>Betweenness Centrality</strong> and <strong>Community Detection</strong></li>
+                    <li><strong>What This Reveals About Your Notes:</strong>
+                        <ul>
+                            <li>High betweenness centrality notes = Your most important conceptual bridges</li>
+                            <li>Communities = Natural topic clusters in your knowledge</li>
+                            <li>Modularity score = How well-separated your topics are</li>
+                        </ul>
+                    </li>
+                </ul>
+                
+                <h4>Themes</h4>
+                <ul>
+                    <li>Light and dark theme support</li>
+                    <li>Theme preference is saved automatically</li>
+                </ul>
+                
+                <h3>Getting Started</h3>
+                <ol>
+                    <li>Click "New Note" to create your first note</li>
+                    <li>Start writing in markdown format</li>
+                    <li>Use <code>[[Note Title]]</code> to link to other notes</li>
+                    <li>Right-click on notes in the sidebar for additional options</li>
+                    <li>You can create new notes by writing a wikilink to a non-existing note; before you get to the final ]], autocomplete will ask if you wish to create that note. Click on that modal to create!</li>
+                </ol>
+                
+                <h3>Block Embeds</h3>
+                <p>If you want to embed blocks from one note in another, you have to give the block an id. To test this, create a note:</p>
+                
+                <pre><code># Source Note
 
 This is a paragraph with a block reference. ^my-block
 
 Another paragraph here. ^another-block</code></pre>
-                    
-                    <p>Then reference those blocks in another note:</p>
-                    
-                    <pre><code># Target Note
+                
+                <p>Then reference those blocks in another note:</p>
+                
+                <pre><code># Target Note
 
 Here's an embedded block:
 ![[Source Note#^my-block]]
 
 And another:
 ![[Source Note#^another-block]]</code></pre>
-                    
-                    <p>When you preview the target note, the other blocks will embed. <strong>Careful</strong> this is fragile:</p>
-                    <ul>
-                        <li>Case sensitivity: <code>![[source note#^my-block]]</code> won't match <code>Source Note</code></li>
-                        <li>Exact title matching: Note titles must match exactly</li>
-                        <li>Only works in preview: Embeds don't show in edit mode</li>
-                    </ul>
-                </div>
-                <div class="welcome-footer">
-                    <button class="btn btn-primary" id="welcomeGotItBtn">Got it!</button>
-                    <label class="welcome-checkbox">
-                        <input type="checkbox" id="welcomeDontShow"> Don't show this again
-                    </label>
-                </div>
+                
+                <p>When you preview the target note, the other blocks will embed. <strong>Careful</strong> this is fragile:</p>
+                <ul>
+                    <li>Case sensitivity: <code>![[source note#^my-block]]</code> won't match <code>Source Note</code></li>
+                    <li>Exact title matching: Note titles must match exactly</li>
+                    <li>Only works in preview: Embeds don't show in edit mode</li>
+                </ul>
             </div>
-            <div class="welcome-overlay"></div>
-        `;
+            <div class="welcome-footer">
+                <button class="btn btn-primary" id="welcomeGotItBtn">Got it!</button>
+                <label class="welcome-checkbox">
+                    <input type="checkbox" id="welcomeDontShow"> Don't show this again
+                </label>
+            </div>
+        </div>
+    `;
 
-        document.body.appendChild(modal);
+    document.body.appendChild(modal);
 
-        // Bind events
-        const closeBtn = modal.querySelector('.welcome-close-btn');
-        const gotItBtn = modal.querySelector('#welcomeGotItBtn');
-        const overlay = modal.querySelector('.welcome-overlay');
-        const dontShowCheckbox = modal.querySelector('#welcomeDontShow');
+    // Bind events
+    const closeBtn = modal.querySelector('.welcome-close-btn');
+    const gotItBtn = modal.querySelector('#welcomeGotItBtn');
+    const overlay = modal.querySelector('.welcome-overlay');
+    const dontShowCheckbox = modal.querySelector('#welcomeDontShow');
 
-        const closeModal = () => {
-            if (dontShowCheckbox.checked) {
-                storage.set('pkm_seen_welcome', true);
-            }
-            modal.remove();
-        };
+    const closeModal = () => {
+        if (dontShowCheckbox.checked) {
+            storage.set('pkm_seen_welcome', true);
+        }
+        modal.remove();
+    };
 
-        closeBtn.addEventListener('click', closeModal);
-        gotItBtn.addEventListener('click', closeModal);
-        overlay.addEventListener('click', closeModal);
+    closeBtn.addEventListener('click', closeModal);
+    gotItBtn.addEventListener('click', closeModal);
+    overlay.addEventListener('click', closeModal);
 
-        // ESC key to close
-        const handleEsc = (e) => {
-            if (e.key === 'Escape') {
-                closeModal();
-                document.removeEventListener('keydown', handleEsc);
-            }
-        };
-        document.addEventListener('keydown', handleEsc);
-    }
+    // ESC key to close
+    const handleEsc = (e) => {
+        if (e.key === 'Escape') {
+            closeModal();
+            document.removeEventListener('keydown', handleEsc);
+        }
+    };
+    document.addEventListener('keydown', handleEsc);
+}
 }
 
 document.addEventListener('DOMContentLoaded', () => {
