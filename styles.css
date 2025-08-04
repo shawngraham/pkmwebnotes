@@ -191,18 +191,153 @@ body {
     right: 0;
     bottom: 0;
     display: flex;
-    overflow-x: auto;
+    overflow-x: auto; /* Keep horizontal scroll for when total width exceeds container */
+    overflow-y: hidden;
     height: 100%;
 }
 
+/* Dark theme adjustments for resize elements */
+[data-theme="dark"] .resize-handle {
+    background: var(--border);
+}
+
+[data-theme="dark"] .resize-handle:hover {
+    background: var(--primary);
+}
+
+[data-theme="dark"] .width-tooltip {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+}
+
+/* Optional: Add subtle animations */
 .editor-container {
-    flex-shrink: 0; 
-    min-width: 450px;
-    width: 450px; 
+    transition: box-shadow 0.2s ease-in-out;
+}
+
+/* Enhanced focus styling that works with resizable panes */
+.editor-container.focused {
+    border-right-color: var(--primary);
+    border-left: 2px solid var(--primary);
+    box-shadow: 0 0 0 1px var(--primary), 0 4px 12px rgba(37, 99, 235, 0.1);
+    background: var(--background);
+    position: relative;
+    z-index: 5; /* Ensure focused pane is above resize handles */
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .resize-handle {
+        width: 8px; /* Slightly wider for touch devices */
+    }
+    
+    .editor-container {
+        min-width: 250px; /* Smaller minimum on mobile */
+    }
+    
+    .resize-handle::before {
+        width: 3px;
+        height: 40px; /* Taller indicator for better touch targets */
+    }
+}
+
+.editor-container {
+    flex: 1; /* Changed from flex-shrink: 0 */
+    min-width: 300px; /* Minimum width to prevent too narrow panes */
+    max-width: 800px; /* Maximum width to prevent overly wide panes */
+    /* Remove the fixed width: 450px; */
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    position: relative;
+}
+
+/* Resize handle between panes */
+.resize-handle {
+    width: 6px;
+    background: var(--border);
+    cursor: col-resize;
+    position: relative;
+    flex-shrink: 0;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+.resize-handle:hover {
+    background: var(--primary);
+}
+
+.resize-handle:active {
+    background: var(--primary);
+}
+
+/* Visual indicator on resize handle */
+.resize-handle::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 30px;
+    background: currentColor;
+    opacity: 0.3;
+    border-radius: 1px;
+    pointer-events: none;
+}
+
+.resize-handle:hover::before {
+    opacity: 0.8;
+    background: white;
+}
+
+/* Dragging state */
+.resize-handle.dragging {
+    background: var(--primary);
+    z-index: 1000;
+}
+
+.resize-handle.dragging::before {
+    opacity: 1;
+    background: white;
+}
+
+/* Prevent text selection during resize */
+.resizing {
+    user-select: none;
+    cursor: col-resize;
+}
+
+.resizing * {
+    pointer-events: none;
+}
+
+.resizing .resize-handle {
+    pointer-events: auto;
+}
+
+/* Width tooltip for resize feedback */
+.width-tooltip {
+    position: fixed;
+    background: var(--text);
+    color: var(--background);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 1001;
+    opacity: 0;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+}
+
+.width-tooltip.visible {
+    opacity: 1;
 }
 
 .editor-container:last-child {

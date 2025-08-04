@@ -6,6 +6,9 @@ class PKMApp {
 
         this.panes = storage.get('pkm_panes', []);
         this.focusedPaneId = storage.get('pkm_focused_pane', null);
+        
+        // Add pane widths storage
+        this.paneWidths = new Map(storage.get('pkm_pane_widths', []));
 
         this.backlinksManager = new BacklinksManager(this.notes);
         this.graphManager = new GraphManager(this.notes);
@@ -14,6 +17,9 @@ class PKMApp {
         this.graphManager.onNodeClick = (noteId) => {
             this.openNote(noteId);
         };
+
+        // Initialize resizable panes system
+        this.resizablePanes = null;
 
         this.init();
     }
@@ -39,6 +45,9 @@ class PKMApp {
         this.loadInitialPanes();
         this.updateRightSidebar();
         
+        // Initialize resizable panes after initial panes are loaded
+        this.initResizablePanes();
+        
         // Show welcome modal on first load
         this.showWelcomeModal();
         
@@ -57,6 +66,20 @@ class PKMApp {
         });
     }
 
+    // Initialize the resizable panes system
+    initResizablePanes() {
+    const container = document.getElementById('editorPanesContainer');
+    if (container && !this.resizablePanes) {
+        this.resizablePanes = new ResizablePanes(container);
+        
+        // Set up the callback for when resize ends
+        this.resizablePanes.onResizeEnd = (paneId, newWidth) => {
+            this.paneWidths.set(paneId, newWidth);
+            storage.set('pkm_pane_widths', Array.from(this.paneWidths.entries()));
+        };
+    }
+}
+
     setupTheme() {
         document.documentElement.setAttribute('data-theme', this.settings.theme);
     }
@@ -68,6 +91,9 @@ class PKMApp {
         document.getElementById('exportBtn').addEventListener('click', () => this.exportNotes());
         document.getElementById('searchInput').addEventListener('input', debounce((e) => this.searchNotes(e.target.value), 300));
         document.getElementById('fileInput').addEventListener('change', (e) => this.handleFileImport(e));
+        
+        // Add reset widths button functionality if you add it to the header
+        // document.getElementById('resetWidthsBtn')?.addEventListener('click', () => this.resetPaneWidths());
     }
 
     loadInitialPanes() {
@@ -92,7 +118,6 @@ class PKMApp {
             mode: 'split',
         };
         this.panes.push(newPane);
-        // Do not focus here, let the calling function decide
         this.savePanes();
         return newPane;
     }
@@ -130,6 +155,9 @@ class PKMApp {
     }
 
     closePane(paneId) {
+        // Remove from resizable panes system
+        this.paneWidths.delete(paneId);
+        
         this.panes = this.panes.filter(p => p.id !== paneId);
         
         if (this.focusedPaneId === paneId) {
@@ -138,7 +166,7 @@ class PKMApp {
         
         this.savePanes();
         this.renderAllPanes();
-        this.updateActiveNoteInSidebar(); // Ensure sidebar is updated after closing a pane
+        this.updateActiveNoteInSidebar();
         this.updateRightSidebar();
     }
     
@@ -157,6 +185,16 @@ class PKMApp {
     getPane(paneId) {
         return this.panes.find(p => p.id === paneId);
     }
+    
+    // Add method to reset all pane widths
+    resetPaneWidths() {
+    if (this.resizablePanes) {
+        this.resizablePanes.resetWidths();
+        // Clear stored widths so they get recalculated
+        this.paneWidths.clear();
+        storage.set('pkm_pane_widths', []);
+    }
+}
     
     // --- Core Data & UI Actions ---
 
@@ -192,43 +230,60 @@ class PKMApp {
     // --- Rendering Logic ---
 
     renderAllPanes() {
-        const container = document.getElementById('editorPanesContainer');
-        container.innerHTML = '';
+    const container = document.getElementById('editorPanesContainer');
+    
+    if (this.panes.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <h3>Welcome to PKM Notes</h3>
+                <p>Select a note from the sidebar or create a new one to get started.</p>
+            </div>`;
+        this.updateRightSidebar();
+        return;
+    }
 
-        if (this.panes.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <h3>Welcome to PKM Notes</h3>
-                    <p>Select a note from the sidebar or create a new one to get started.</p>
-                </div>`;
-            this.updateRightSidebar();
+    // Clear container but preserve any existing resize handles temporarily
+    const existingHandles = Array.from(container.querySelectorAll('.resize-handle'));
+    container.innerHTML = '';
+
+    // Render panes
+    this.panes.forEach((pane, index) => {
+        const note = this.notes[pane.noteId];
+        if (!note) {
+            this.closePane(pane.id);
             return;
         }
 
-        this.panes.forEach(pane => {
-            const note = this.notes[pane.noteId];
-            if (!note) {
-                this.closePane(pane.id);
-                return;
-            };
-
-            const paneEl = document.createElement('div');
-            paneEl.className = 'editor-container';
-            paneEl.dataset.paneId = pane.id;
-            
-            if(pane.id === this.focusedPaneId) {
-                paneEl.classList.add('focused');
-            }
-
-            paneEl.innerHTML = this.getEditorHTML(note, pane);
-            container.appendChild(paneEl);
-            
-            this.bindPaneEvents(paneEl, pane);
-            this.updatePaneContent(paneEl, note);
-        });
+        const paneEl = document.createElement('div');
+        paneEl.className = 'editor-container';
+        paneEl.dataset.paneId = pane.id;
+        paneEl.id = pane.id; // Important: set ID for resizable panes system
         
-        this.savePanes();
+        if(pane.id === this.focusedPaneId) {
+            paneEl.classList.add('focused');
+        }
+
+        paneEl.innerHTML = this.getEditorHTML(note, pane);
+        container.appendChild(paneEl);
+        
+        this.bindPaneEvents(paneEl, pane);
+        this.updatePaneContent(paneEl, note);
+        
+        // Apply saved width (REPLACE the old resizable code with this)
+        const savedWidth = this.paneWidths.get(pane.id) || 450;
+paneEl.style.width = `${savedWidth}px`;
+paneEl.style.flex = 'none'; // Override flexbox behavior
+    });
+    
+    // Update resizable panes system after all panes are rendered
+    if (this.resizablePanes) {
+        this.resizablePanes.update();
+        // Apply stored widths after handles are created
+        this.resizablePanes.applyStoredWidths(this.paneWidths);
     }
+    
+    this.savePanes(); // This line stays at the end
+}
 
     getEditorHTML(note, pane) {
         return `
@@ -262,7 +317,11 @@ class PKMApp {
         let originalTitle = this.notes[pane.noteId].title;
 
         paneEl.addEventListener('click', () => this.setFocusedPane(pane.id));
-        paneEl.querySelector('.close-pane-btn').addEventListener('click', (e) => { e.stopPropagation(); this.closePane(pane.id); });
+        paneEl.querySelector('.close-pane-btn').addEventListener('click', (e) => { 
+            e.stopPropagation(); 
+            this.closePane(pane.id); 
+        });
+        
         paneEl.querySelectorAll('.mode-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -351,7 +410,7 @@ class PKMApp {
     }
     
     // --- Right Sidebar ---
-        updateRightSidebar() {
+    updateRightSidebar() {
         const rightSidebar = document.getElementById('rightSidebar');
         const container = rightSidebar.querySelector('.right-sidebar-content');
         const focusedPane = this.getPane(this.focusedPaneId);
@@ -695,12 +754,36 @@ class PKMApp {
         onComplete();
         textarea.focus();
     }
+
+    // --- Search functionality ---
+    searchNotes(query) {
+        const noteList = document.getElementById('noteList');
+        const items = noteList.querySelectorAll('.note-item');
+        
+        if (!query.trim()) {
+            // Show all notes when search is empty
+            items.forEach(item => item.style.display = 'block');
+            return;
+        }
+        
+        const searchTerm = query.toLowerCase();
+        items.forEach(item => {
+            const noteId = item.dataset.noteId;
+            const note = this.notes[noteId];
+            const titleMatch = note.title.toLowerCase().includes(searchTerm);
+            const contentMatch = note.content.toLowerCase().includes(searchTerm);
+            
+            item.style.display = (titleMatch || contentMatch) ? 'block' : 'none';
+        });
+    }
     
     saveNotes() { storage.set('pkm_notes', this.notes); }
     saveSettings() { storage.set('pkm_settings', this.settings); }
     savePanes() {
         storage.set('pkm_panes', this.panes);
         storage.set('pkm_focused_pane', this.focusedPaneId);
+        // Also save pane widths
+        storage.set('pkm_pane_widths', Array.from(this.paneWidths.entries()));
     }
     
     importFiles() { document.getElementById('fileInput').click(); }
@@ -933,6 +1016,8 @@ class PKMApp {
                     <li>Close individual panes with the X button</li>
                     <li>Right-click a note in the note list to open in a new pane; use horizontal scroll bar if necessary!</li>
                     <li>Right sidebar shows information for the currently focused note</li>
+                    <li><strong>NEW:</strong> Drag the handles between panes to resize them</li>
+                    <li><strong>NEW:</strong> Double-click resize handles to auto-size panes equally</li>
                 </ul>
                 
                 <h4>Import and Export</h4>
@@ -974,6 +1059,7 @@ class PKMApp {
                     <li>Use <code>[[Note Title]]</code> to link to other notes</li>
                     <li>Right-click on notes in the sidebar for additional options</li>
                     <li>You can create new notes by writing a wikilink to a non-existing note; before you get to the final ]], autocomplete will ask if you wish to create that note. Click on that modal to create!</li>
+                    <li><strong>Resize panes by dragging the handles between them</strong></li>
                 </ol>
                 
                 <h3>Block Embeds</h3>
@@ -1042,5 +1128,5 @@ And another:
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    new PKMApp();
+    window.app = new PKMApp();
 });
