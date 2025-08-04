@@ -1,5 +1,5 @@
 // Note class
-class Note {
+export class Note {
     constructor(title = 'Untitled', content = '') {
         this.id = this.generateId();
         this.title = title;

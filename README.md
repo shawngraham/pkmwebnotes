@@ -32,17 +32,6 @@ This is a **toy** that I intend to use with students to introduce ideas of perso
 - Close individual panes with the X button
 - Right sidebar shows information for the currently focused note
 
-### Python Code Execution<
-- Write Python code in markdown blocks (<code>\`\`\`python</code>) and execute it directly in your notes.
-- Standard output (from <code>print()</code>) and the final result are displayed below the code.
-- Load external data (e.g., a CSV file) by adding a special directive to the top of a code block: <code>#data_url: *your_url_here*</code>. The raw text content from the URL will be automatically loaded into a variable named <code>fetched_data</code> for you to use in your script, eg <code>df = pd.read_csv(StringIO(fetched_data))</code>.</li>
-- NB:</b> The first time you run Python code, it may take a few seconds to initialize the environment, during which the app might seem frozen.
-- Install packages with micropip:
-```
-await micropip.install('seaborn')
-import seaborn as sns
-```
-
 ### Import and Export
 - Import markdown (.md) and text (.txt) files
 - Export options:

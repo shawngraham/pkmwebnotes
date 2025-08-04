@@ -1,5 +1,4 @@
-// Simple storage utilities
-const storage = {
+export const storage = {
     get: (key, defaultValue = {}) => {
         try {
             return JSON.parse(localStorage.getItem(key)) || defaultValue;
@@ -12,8 +11,8 @@ const storage = {
     }
 };
 
-// Debounce utility
-const debounce = (func, wait) => {
+// Add 'export' before the constant declaration
+export const debounce = (func, wait) => {
     let timeout;
     return function executedFunction(...args) {
         const later = () => {

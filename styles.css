@@ -196,62 +196,99 @@ body {
     height: 100%;
 }
 
-/* Dark theme adjustments for resize elements */
-[data-theme="dark"] .resize-handle {
-    background: var(--border);
-}
-
-[data-theme="dark"] .resize-handle:hover {
-    background: var(--primary);
-}
-
-[data-theme="dark"] .width-tooltip {
-    background: var(--surface);
-    color: var(--text);
-    border: 1px solid var(--border);
-}
-
-/* Optional: Add subtle animations */
+/* Enhanced Editor Container with Maximize Support */
 .editor-container {
-    transition: box-shadow 0.2s ease-in-out;
+    flex: 1;
+    min-width: 300px;
+    max-width: 800px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Enhanced focus styling that works with resizable panes */
+.editor-container:last-child {
+    border-right: none;
+}
+
+/* Maximized pane styling */
+.editor-container.maximized {
+    position: relative;
+    z-index: 100;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15) !important;
+    border: 2px solid var(--primary) !important;
+    border-radius: 8px !important;
+    background: var(--background) !important;
+    margin: 2px !important;
+    min-width: 0 !important;       
+    max-width: 100% !important; 
+}
+
+[data-theme="dark"] .editor-container.maximized {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Enhanced visual feedback for maximized state */
+.editor-container.maximized::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, var(--primary), var(--warning));
+    border-radius: 10px;
+    z-index: -1;
+    animation: maximizedGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes maximizedGlow {
+    from {
+        opacity: 0.5;
+    }
+    to {
+        opacity: 0.8;
+    }
+}
+
+/* Focus styling */
 .editor-container.focused {
     border-right-color: var(--primary);
     border-left: 2px solid var(--primary);
     box-shadow: 0 0 0 1px var(--primary), 0 4px 12px rgba(37, 99, 235, 0.1);
     background: var(--background);
     position: relative;
-    z-index: 5; /* Ensure focused pane is above resize handles */
+    z-index: 5;
+    transform: translateY(-1px);
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .resize-handle {
-        width: 8px; /* Slightly wider for touch devices */
-    }
-    
-    .editor-container {
-        min-width: 250px; /* Smaller minimum on mobile */
-    }
-    
-    .resize-handle::before {
-        width: 3px;
-        height: 40px; /* Taller indicator for better touch targets */
-    }
+.editor-container.focused:first-child {
+    border-left: 2px solid var(--primary);
 }
 
-.editor-container {
-    flex: 1; /* Changed from flex-shrink: 0 */
-    min-width: 300px; /* Minimum width to prevent too narrow panes */
-    max-width: 800px; /* Maximum width to prevent overly wide panes */
-    /* Remove the fixed width: 450px; */
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    position: relative;
+/* Enhanced focus indicators for maximized state */
+.editor-container.maximized.focused {
+    border-color: var(--warning) !important;
+    box-shadow: 
+        0 0 0 2px var(--warning),
+        0 8px 32px rgba(0, 0, 0, 0.15) !important;
+}
+
+[data-theme="dark"] .editor-container.maximized.focused {
+    box-shadow: 
+        0 0 0 2px var(--warning),
+        0 8px 32px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Ensure proper layout when panes are hidden during maximize */
+.editor-panes-container {
+    gap: 0;
+}
+
+.editor-container[style*="display: none"] {
+    display: none !important;
 }
 
 /* Resize handle between panes */
@@ -340,20 +377,198 @@ body {
     opacity: 1;
 }
 
-.editor-container:last-child {
-    border-right: none;
+/* Dark theme adjustments for resize elements */
+[data-theme="dark"] .resize-handle {
+    background: var(--border);
 }
 
-.editor-container.focused {
-    border-right-color: var(--primary);
-    border-left: 2px solid var(--primary);
-    box-shadow: 0 0 0 1px var(--primary), 0 4px 12px rgba(37, 99, 235, 0.1);
+[data-theme="dark"] .resize-handle:hover {
+    background: var(--primary);
+}
+
+[data-theme="dark"] .width-tooltip {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+}
+
+/* Editor Header */
+.editor-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+}
+
+.editor-title-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.editor-title {
+    font-weight: 500;
+    color: var(--text);
+}
+
+.close-pane-btn {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+
+.close-pane-btn:hover {
+    color: var(--text);
+    background-color: var(--border);
+}
+
+.editor-modes {
+    display: flex !important;
+    gap: 4px !important;
+    align-items: center !important;
+}
+
+.mode-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
     background: var(--background);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.mode-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+/* Maximize Button Styling */
+.maximize-btn {
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 4px !important;
+    background: var(--surface) !important;
+    color: var(--text) !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    margin-left: 8px !important;
+    min-width: 28px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s ease !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.maximize-btn:hover {
+    background: var(--primary) !important;
+    color: white !important;
+    border-color: var(--primary) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2) !important;
+}
+
+/* Animation for maximize button icon */
+.maximize-btn::before {
+    font-family: "Font Awesome 5 Free"; /* Or your specific version */
+    content: "\f065";
+    font-weight: 900; /* Required for solid icons */
+    display: inline-block;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: all 0.3s ease;
+}
+
+.maximize-btn.minimized::before {
+    content: '\2922'; /* Unicode for a minimize symbol */
+}
+
+.maximize-btn:active::before {
+    width: 100px;
+    height: 100px;
+}
+
+/* Focused pane maximize button styling */
+.editor-container.focused .maximize-btn {
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.editor-container.focused .maximize-btn:hover {
+    background: white !important;
+    color: var(--primary) !important;
+    border-color: white !important;
+}
+
+/* Accessibility improvements */
+.maximize-btn:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+.maximize-btn:focus:not(:focus-visible) {
+    outline: none;
+}
+
+.maximize-btn:focus-visible {
+    box-shadow: 
+        0 0 0 2px var(--background),
+        0 0 0 4px var(--primary) !important;
+}
+
+/* Tooltip enhancement for maximize button */
+.maximize-btn[title] {
     position: relative;
 }
 
-.editor-container.focused:first-child {
-    border-left: 2px solid var(--primary);
+.maximize-btn[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 8px;
+    background: var(--text);
+    color: var(--background);
+    font-size: 11px;
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 1000;
+    margin-bottom: 4px;
+    opacity: 0;
+    animation: fadeInTooltip 0.2s ease forwards;
+}
+
+@keyframes fadeInTooltip {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
 }
 
 /* Focused pane header styling */
@@ -405,10 +620,26 @@ body {
     background-color: rgba(255, 255, 255, 0.1);
 }
 
-/* Subtle focus indicator on textarea */
-.editor-container.focused .editor-textarea {
-    border-left: 3px solid var(--primary);
-    background: var(--background);
+/* Maximized pane header enhancement */
+.editor-container.maximized .editor-header {
+    background: linear-gradient(135deg, var(--primary), rgba(37, 99, 235, 0.9)) !important;
+    color: white !important;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 6px 6px 0 0 !important;
+}
+
+.editor-container.maximized .editor-title {
+    color: white !important;
+    font-weight: 600 !important;
+}
+
+.editor-container.maximized .close-pane-btn {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.editor-container.maximized .close-pane-btn:hover {
+    color: white !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 /* Dark theme adjustments */
@@ -420,78 +651,11 @@ body {
     background: linear-gradient(135deg, var(--primary), rgba(59, 130, 246, 0.8));
 }
 
-/* Optional: Subtle animation when focus changes */
-.editor-container {
-    transition: all 0.2s ease-in-out;
+[data-theme="dark"] body {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
 }
 
-.editor-container.focused {
-    transform: translateY(-1px);
-}
-
-/* Alternative: More subtle approach */
-.editor-container.focused-subtle {
-    border-left: 4px solid var(--primary);
-    background: linear-gradient(to right, rgba(37, 99, 235, 0.02), transparent);
-}
-
-.editor-container.focused-subtle .editor-header {
-    background: var(--surface);
-    border-bottom: 2px solid var(--primary);
-}
-
-.editor-header {
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--surface);
-}
-
-.editor-title {
-    font-weight: 500;
-    color: var(--text);
-}
-
-.close-pane-btn {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    font-size: 18px;
-    line-height: 1;
-    padding: 2px 4px;
-    border-radius: 4px;
-}
-
-.close-pane-btn:hover {
-    color: var(--text);
-    background-color: var(--border);
-}
-
-.editor-modes {
-    display: flex;
-    gap: 4px;
-}
-
-.mode-btn {
-    padding: 6px 12px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--background);
-    color: var(--text);
-    cursor: pointer;
-    font-size: 12px;
-}
-
-.mode-btn.active {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
-}
-
+/* Editor Content */
 .editor-content {
     flex: 1;
     display: grid;
@@ -540,6 +704,12 @@ body {
     background: var(--background);
     color: var(--text);
     resize: none;
+}
+
+/* Subtle focus indicator on textarea */
+.editor-container.focused .editor-textarea {
+    border-left: 3px solid var(--primary);
+    background: var(--background);
 }
 
 .preview-content {
@@ -700,19 +870,112 @@ body {
     stroke-opacity: 0.6;
 }
 
+/* Graph Controls Styling */
+.graph-controls {
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    padding: 4px;
+}
+
+.step-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.step-btn:hover {
+    background: var(--background);
+    border-color: var(--primary);
+    transform: translateY(-1px);
+}
+
+.step-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+}
+
+/* Graph SVG Container */
+.graph-svg-container {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--background);
+    margin-bottom: 8px;
+    position: relative;
+}
+
+/* Step Legend Styling */
+.step-legend {
+    pointer-events: none;
+    user-select: none;
+}
+
+.step-legend text {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 9px;
+    fill: var(--text-muted);
+}
+
+.step-legend circle {
+    stroke: var(--border);
+    stroke-width: 1;
+}
+
+/* Enhanced graph node styling for different steps */
+.graph-container svg .node-step-1 {
+    filter: drop-shadow(0 2px 4px rgba(5, 150, 105, 0.3));
+}
+
+.graph-container svg .node-step-2 {
+    filter: drop-shadow(0 1px 3px rgba(217, 119, 6, 0.3));
+}
+
+.graph-container svg .node-step-3 {
+    filter: drop-shadow(0 1px 2px rgba(100, 116, 139, 0.2));
+}
+
+/* Dark theme adjustments */
+[data-theme="dark"] .step-btn {
+    background: var(--surface);
+    border-color: var(--border);
+}
+
+[data-theme="dark"] .step-btn:hover {
+    background: var(--background);
+}
+
+[data-theme="dark"] .step-btn.active {
+    background: var(--primary);
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+[data-theme="dark"] .graph-svg-container {
+    background: var(--surface);
+}
+
 /* Autocomplete */
 .autocomplete {
-    position: fixed;
+    position: fixed !important;
+    display: block !important;
+    visibility: visible !important;
+    z-index: 9999 !important;
+    opacity: 1 !important;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     max-height: 200px;
     overflow-y: auto;
-    z-index: 1000;
     min-width: 200px;
-    display: block !important;
-    visibility: visible !important;
 }
 
 [data-theme="dark"] .autocomplete {
@@ -870,110 +1133,6 @@ body {
     background: var(--surface);
     color: var(--text-muted);
     font-style: italic;
-}
-
-.autocomplete {
-    position: fixed !important;
-    display: block !important;
-    visibility: visible !important;
-    z-index: 9999 !important;
-    opacity: 1 !important;
-}
-
-/* Graph Controls Styling */
-.graph-controls {
-    margin-bottom: 8px;
-    display: flex;
-    justify-content: center;
-    gap: 4px;
-    padding: 4px;
-}
-
-.step-btn {
-    padding: 4px 8px;
-    font-size: 11px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--surface);
-    color: var(--text);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    font-family: inherit;
-}
-
-.step-btn:hover {
-    background: var(--background);
-    border-color: var(--primary);
-    transform: translateY(-1px);
-}
-
-.step-btn.active {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
-    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
-}
-
-/* Graph SVG Container */
-.graph-svg-container {
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--background);
-    margin-bottom: 8px;
-    position: relative;
-}
-
-/* Step Legend Styling */
-.step-legend {
-    pointer-events: none;
-    user-select: none;
-}
-
-.step-legend text {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 9px;
-    fill: var(--text-muted);
-}
-
-.step-legend circle {
-    stroke: var(--border);
-    stroke-width: 1;
-}
-
-/* Enhanced graph node styling for different steps */
-.graph-container svg .node-step-1 {
-    filter: drop-shadow(0 2px 4px rgba(5, 150, 105, 0.3));
-}
-
-.graph-container svg .node-step-2 {
-    filter: drop-shadow(0 1px 3px rgba(217, 119, 6, 0.3));
-}
-
-.graph-container svg .node-step-3 {
-    filter: drop-shadow(0 1px 2px rgba(100, 116, 139, 0.2));
-}
-
-/* Dark theme adjustments */
-[data-theme="dark"] .step-btn {
-    background: var(--surface);
-    border-color: var(--border);
-}
-
-[data-theme="dark"] .step-btn:hover {
-    background: var(--background);
-}
-
-[data-theme="dark"] .step-btn.active {
-    background: var(--primary);
-    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
-}
-
-[data-theme="dark"] .graph-svg-container {
-    background: var(--surface);
-}
-
-[data-theme="dark"] body {
-    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
 }
 
 /* Welcome Modal */
@@ -1144,7 +1303,126 @@ body {
     background: rgba(0, 0, 0, 0.7);
 }
 
-/* Responsive adjustments for smaller screens */
+/* Code Execution Styles */
+.code-container {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 16px;
+    background: var(--surface);
+    overflow: hidden;
+}
+
+.code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--background);
+    border-bottom: 1px solid var(--border);
+}
+
+.code-header span {
+    font-weight: 500;
+    font-size: 12px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.run-btn {
+    padding: 4px 10px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.run-btn:hover {
+    background-color: #1d4ed8;
+}
+
+[data-theme="dark"] .run-btn:hover {
+    background-color: #60a5fa;
+}
+
+.run-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.code-container pre {
+    margin: 0;
+    border-radius: 0;
+}
+
+.code-output {
+    padding: 12px;
+    font-family: 'SF Mono', Monaco, Inconsolata, monospace;
+    font-size: 13px;
+    background: var(--background);
+    border-top: 1px dashed var(--border);
+    min-height: 1.5em;
+}
+
+.code-output pre {
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 0;
+}
+
+.code-output .output-text {
+    color: var(--text);
+}
+
+.code-output .output-result {
+    color: var(--success);
+    margin-top: 8px;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+}
+
+.code-output .output-error {
+    color: #ef4444;
+}
+
+.code-output .spinner {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .maximize-btn {
+        border-width: 2px !important;
+    }
+    
+    .editor-container.maximized {
+        border-width: 3px !important;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .editor-container,
+    .maximize-btn,
+    .maximize-btn::before,
+    .editor-container.maximized::before {
+        transition: none !important;
+        animation: none !important;
+    }
+}
+
+/* Print styles - hide maximize buttons */
+@media print {
+    .maximize-btn {
+        display: none !important;
+    }
+}
+
+/* Responsive adjustments */
 @media (max-width: 768px) {
     body {
         padding: 10px;
@@ -1162,6 +1440,26 @@ body {
     
     .main {
         grid-template-columns: 240px minmax(0, 1fr) 240px;
+    }
+    
+    .resize-handle {
+        width: 8px;
+    }
+    
+    .editor-container {
+        min-width: 250px;
+    }
+    
+    .resize-handle::before {
+        width: 3px;
+        height: 40px;
+    }
+    
+    .maximize-btn {
+        padding: 3px 6px !important;
+        font-size: 11px !important;
+        min-width: 24px !important;
+        margin-left: 4px !important;
     }
     
     .graph-controls {

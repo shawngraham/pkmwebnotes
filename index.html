@@ -4,11 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PKM Notes</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
     <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
+
 </head>
 <body>
     <div class="app">
@@ -60,14 +58,22 @@
     </div>
 
     <input type="file" id="fileInput" multiple accept=".md,.txt" class="hidden">
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+  
+    <script type="module" src="app.js"></script>
 
+    <!-- 
     <script src="utils.js"></script>
     <script src="note.js"></script>
     <script src="backlinks.js"></script>
     <script src="autocomplete.js"></script>
     <script src="graph.js"></script>
     <script src="resizable-panes.js"></script>
-    <script src="app.js"></script>
+    <script src="pyodideManager.js"></script>
+    <script src="app.js"></script> -->
 
 </body>
 </html>

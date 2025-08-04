@@ -1,5 +1,5 @@
 // Backlinks manager
-class BacklinksManager {
+export class BacklinksManager {
     constructor(notes) {
         this.notes = notes;
     }

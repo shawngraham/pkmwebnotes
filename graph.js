@@ -1,5 +1,5 @@
 // Enhanced Graph visualization manager with multi-step support
-class GraphManager {
+export class GraphManager {
     constructor(notes) {
         this.notes = notes;
         this.svg = null;

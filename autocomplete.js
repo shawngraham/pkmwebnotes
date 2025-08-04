@@ -1,5 +1,5 @@
 // Autocomplete manager
-class AutocompleteManager {
+export class AutocompleteManager {
     constructor(notes, container) {
         this.notes = notes;
         this.container = container;

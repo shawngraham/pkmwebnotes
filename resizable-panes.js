@@ -1,5 +1,5 @@
-// Debug version of ResizablePanes with console logging
-class ResizablePanes {
+// Enhanced ResizablePanes with simplified maximize/minimize functionality
+export class ResizablePanes {
     constructor(container) {
         console.log('🔧 ResizablePanes constructor called', container);
         this.container = container;
@@ -8,13 +8,13 @@ class ResizablePanes {
         this.startX = 0;
         this.leftPaneStartWidth = 0;
         this.rightPaneStartWidth = 0;
-
-        // Create the tooltip once
-        this.createWidthTooltip();
-        // Attach global listeners that live for the lifetime of the app
-        this.attachGlobalListeners();
         
-        // Callback for when resize ends - to be set by PKMApp
+        // Simplified maximize state management
+        this.maximizedPane = null;
+        this.preMaximizeState = null; // Store entire layout state
+        
+        this.createWidthTooltip();
+        this.attachGlobalListeners();
         this.onResizeEnd = null;
         
         console.log('✅ ResizablePanes initialized successfully');
@@ -23,7 +23,6 @@ class ResizablePanes {
     createWidthTooltip() {
         const existing = document.getElementById('widthTooltip');
         if (existing) {
-            console.log('📝 Width tooltip already exists, reusing it');
             this.tooltip = existing;
             return;
         }
@@ -33,15 +32,17 @@ class ResizablePanes {
         tooltip.className = 'width-tooltip';
         document.body.appendChild(tooltip);
         this.tooltip = tooltip;
-        console.log('📝 Width tooltip created');
     }
 
     attachGlobalListeners() {
-        console.log('🎯 Attaching global listeners');
-        document.addEventListener('mousemove', this.handleResize.bind(this));
-        document.addEventListener('mouseup', this.stopResize.bind(this));
-        document.addEventListener('touchmove', this.handleResize.bind(this), { passive: false });
-        document.addEventListener('touchend', this.stopResize.bind(this));
+        // Use arrow functions to maintain 'this' context
+        this.handleResizeEvent = this.handleResize.bind(this);
+        this.stopResizeEvent = this.stopResize.bind(this);
+        
+        document.addEventListener('mousemove', this.handleResizeEvent);
+        document.addEventListener('mouseup', this.stopResizeEvent);
+        document.addEventListener('touchmove', this.handleResizeEvent, { passive: false });
+        document.addEventListener('touchend', this.stopResizeEvent);
         
         document.addEventListener('contextmenu', (e) => {
             if (e.target.classList.contains('resize-handle')) {
@@ -51,155 +52,285 @@ class ResizablePanes {
     }
 
     /**
-     * This is the main method to call whenever the panes are re-rendered.
-     * It finds all panes, adds handles between them.
+     * Main update method - simplified logic
      */
     update() {
         console.log('🔄 ResizablePanes.update() called');
         
-        // Remove all existing resize handles
-        const existingHandles = this.container.querySelectorAll('.resize-handle');
-        console.log(`🗑️ Removing ${existingHandles.length} existing handles`);
-        existingHandles.forEach(handle => handle.remove());
+        // Clear existing handles and buttons
+        this.clearExistingElements();
         
         const panes = Array.from(this.container.querySelectorAll('.editor-container'));
-        console.log(`📊 Found ${panes.length} panes to work with`);
+        console.log(`📊 Found ${panes.length} panes`);
         
-        // Add handles between panes
-        panes.forEach((pane, index) => {
-            console.log(`📋 Processing pane ${index}: ${pane.id}`);
-            if (index < panes.length - 1) {
-                const handle = this.createResizeHandle(pane, panes[index + 1]);
-                const insertResult = pane.parentNode.insertBefore(handle, pane.nextSibling);
-                console.log(`➕ Added resize handle between ${pane.id} and ${panes[index + 1].id}`);
-                console.log(`📍 Handle inserted:`, insertResult);
-                console.log(`📍 Handle parent:`, handle.parentNode);
-                console.log(`📍 Handle position in DOM:`, Array.from(handle.parentNode.children).indexOf(handle));
-            }
-        });
+        if (panes.length === 0) return;
+        
+        // Add maximize buttons to all panes
+        panes.forEach(pane => this.addMaximizeButton(pane));
+        
+        // Only add resize handles if not maximized
+        if (!this.maximizedPane) {
+            this.addResizeHandles(panes);
+            this.applyNormalLayout(panes);
+        } else {
+            this.applyMaximizedLayout(panes);
+        }
         
         console.log('✅ ResizablePanes.update() completed');
     }
 
-    /**
-     * Apply stored widths to panes
-     */
-    applyStoredWidths(paneWidths) {
-        console.log('📐 Applying stored widths:', paneWidths);
-        const panes = Array.from(this.container.querySelectorAll('.editor-container'));
+    clearExistingElements() {
+        // Remove existing resize handles
+        const existingHandles = this.container.querySelectorAll('.resize-handle');
+        existingHandles.forEach(handle => handle.remove());
+        
+        // Remove existing maximize buttons
+        const existingMaxButtons = this.container.querySelectorAll('.maximize-btn');
+        existingMaxButtons.forEach(btn => btn.remove());
+    }
+
+    addResizeHandles(panes) {
+        for (let i = 0; i < panes.length - 1; i++) {
+            const handle = this.createResizeHandle(panes[i], panes[i + 1]);
+            panes[i].parentNode.insertBefore(handle, panes[i].nextSibling);
+        }
+    }
+
+    applyNormalLayout(panes) {
         panes.forEach(pane => {
-            const paneId = pane.id;
-            const storedWidth = paneWidths.get(paneId);
-            if (storedWidth) {
-                pane.style.width = `${storedWidth}px`;
-                pane.style.flex = 'none'; // Override flex behavior
-                console.log(`📏 Applied width ${storedWidth}px to pane ${paneId}`);
-            } else {
-                console.log(`⚠️ No stored width for pane ${paneId}`);
-            }
+            pane.style.display = 'flex';
+            pane.classList.remove('maximized');
+            // Width will be handled by applyStoredWidths or default flex
         });
     }
 
+    applyMaximizedLayout(panes) {
+    // Force container to recognize new layout
+    this.container.style.display = 'block';
+    
+    const containerWidth = this.container.getBoundingClientRect().width - 20;
+    
+    panes.forEach(pane => {
+        if (pane.id === this.maximizedPane) {
+            pane.style.display = 'flex';
+            pane.style.width = `${containerWidth}px`;
+            pane.style.maxWidth = '100%';
+            pane.style.flex = '0 0 auto';
+            pane.classList.add('maximized');
+        } else {
+            pane.style.display = 'none';
+        }
+    });
+    
+    // Reset container display
+    this.container.style.display = '';
+}
+
+    addMaximizeButton(pane) {
+        const header = pane.querySelector('.editor-header .editor-modes');
+        if (!header) return;
+
+        const maximizeBtn = document.createElement('button');
+        maximizeBtn.className = 'maximize-btn btn';
+        maximizeBtn.innerHTML = this.maximizedPane === pane.id ? '🗗' : '🗖';
+        maximizeBtn.title = this.maximizedPane === pane.id ? 'Restore' : 'Maximize';
+        maximizeBtn.style.cssText = `
+            margin-left: 8px;
+            padding: 4px 8px;
+            font-size: 12px;
+            min-width: 28px;
+        `;
+        
+        maximizeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleMaximize(pane.id);
+        });
+        
+        header.appendChild(maximizeBtn);
+    }
+
     /**
-     * Reset all panes to equal widths
+     * Simplified toggle maximize
      */
-    resetWidths() {
-        console.log('🔄 Resetting all pane widths');
+    toggleMaximize(paneId) {
+        console.log(`🔄 Toggling maximize for pane ${paneId}`);
+        
+        if (this.maximizedPane === paneId) {
+            this.restoreFromMaximized();
+        } else {
+            this.maximizePane(paneId);
+        }
+    }
+
+    maximizePane(paneId) {
+        console.log(`📈 Maximizing pane ${paneId}`);
+        
+        // Save current state before maximizing
+        this.saveCurrentLayout();
+        this.maximizedPane = paneId;
+        
+        // Update layout
+        this.update();
+        
+        // Notify parent about resize
+        if (this.onResizeEnd) {
+            const containerWidth = this.container.offsetWidth - 20;
+            this.onResizeEnd(paneId, containerWidth);
+        }
+    }
+
+    restoreFromMaximized() {
+        console.log('📉 Restoring from maximized state');
+        
+        if (!this.maximizedPane) return;
+        
+        this.maximizedPane = null;
+        
+        // Update layout
+        this.update();
+        
+        // Restore previous widths if available
+        if (this.preMaximizeState) {
+            this.restoreLayout();
+        }
+    }
+
+    saveCurrentLayout() {
         const panes = Array.from(this.container.querySelectorAll('.editor-container'));
-        if (panes.length === 0) {
-            console.log('⚠️ No panes found for reset');
+        this.preMaximizeState = panes.map(pane => ({
+            id: pane.id,
+            width: pane.offsetWidth,
+            display: pane.style.display || 'flex'
+        }));
+        console.log('💾 Saved layout state:', this.preMaximizeState);
+    }
+
+    restoreLayout() {
+        if (!this.preMaximizeState) return;
+        
+        this.preMaximizeState.forEach(state => {
+            const pane = document.getElementById(state.id);
+            if (pane) {
+                pane.style.width = `${state.width}px`;
+                pane.style.flex = 'none';
+                pane.style.display = state.display;
+                
+                // Notify parent
+                if (this.onResizeEnd) {
+                    this.onResizeEnd(state.id, state.width);
+                }
+            }
+        });
+        
+        console.log('🔄 Restored layout state');
+    }
+
+    // Status methods
+    isMaximized() {
+        return this.maximizedPane !== null;
+    }
+
+    getMaximizedPane() {
+        return this.maximizedPane;
+    }
+
+    /**
+     * Apply stored widths (only when not maximized)
+     */
+    applyStoredWidths(paneWidths) {
+        if (this.maximizedPane) {
+            console.log('📐 Skipping width application - pane is maximized');
             return;
         }
         
-        const containerWidth = this.container.offsetWidth;
-        const handleWidth = 6; // Width of resize handles
-        const totalHandleWidth = (panes.length - 1) * handleWidth;
-        const availableWidth = containerWidth - totalHandleWidth;
-        const equalWidth = Math.floor(availableWidth / panes.length);
+        console.log('📐 Applying stored widths:', paneWidths);
+        const panes = Array.from(this.container.querySelectorAll('.editor-container'));
         
-        console.log(`📊 Container: ${containerWidth}px, Available: ${availableWidth}px, Equal: ${equalWidth}px`);
+        panes.forEach(pane => {
+            const storedWidth = paneWidths.get(pane.id);
+            if (storedWidth) {
+                pane.style.width = `${storedWidth}px`;
+                pane.style.flex = 'none';
+            }
+        });
+    }
+
+    resetWidths() {
+        console.log('🔄 Resetting all pane widths');
+        
+        // If maximized, restore first
+        if (this.maximizedPane) {
+            this.restoreFromMaximized();
+        }
+        
+        const panes = Array.from(this.container.querySelectorAll('.editor-container'));
+        if (panes.length === 0) return;
+        
+        const containerWidth = this.container.offsetWidth;
+        const handleWidth = 6;
+        const totalHandles = panes.length - 1;
+        const availableWidth = containerWidth - (totalHandles * handleWidth);
+        const equalWidth = Math.floor(availableWidth / panes.length);
         
         panes.forEach(pane => {
             pane.style.width = `${equalWidth}px`;
+            pane.style.flex = 'none';
+            
             if (this.onResizeEnd) {
                 this.onResizeEnd(pane.id, equalWidth);
             }
-            console.log(`📏 Reset pane ${pane.id} to ${equalWidth}px`);
         });
+        
+        this.update();
     }
 
-    /**
-     * Get current pane widths
-     */
-    getPaneWidths() {
-        const panes = Array.from(this.container.querySelectorAll('.editor-container'));
-        const widths = panes.map(pane => ({
-            id: pane.id,
-            width: pane.offsetWidth
-        }));
-        console.log('📊 Current pane widths:', widths);
-        return widths;
-    }
-
+    // Resize handle creation and management
     createResizeHandle(leftPane, rightPane) {
-        console.log(`🎚️ Creating resize handle between ${leftPane.id} and ${rightPane.id}`);
         const handle = document.createElement('div');
         handle.className = 'resize-handle';
-        
-        // Store references to the panes this handle controls
         handle.leftPane = leftPane;
         handle.rightPane = rightPane;
         
-        handle.addEventListener('mousedown', (e) => {
-            console.log('🖱️ Mouse down on resize handle');
-            this.startResize(e, handle);
-        });
-        handle.addEventListener('dblclick', (e) => {
-            console.log('🖱️ Double click on resize handle');
-            this.autoSize(e, handle);
-        });
-        handle.addEventListener('touchstart', (e) => {
-            console.log('👆 Touch start on resize handle');
-            this.startResize(e, handle);
-        });
+        handle.addEventListener('mousedown', (e) => this.startResize(e, handle));
+        handle.addEventListener('dblclick', (e) => this.autoSize(e, handle));
+        handle.addEventListener('touchstart', (e) => this.startResize(e, handle));
         
-        // Enhanced debug styling to make handles more visible and grabbable
-        //handle.style.backgroundColor = 'red';
-        handle.style.opacity = '0.8';
-        handle.style.position = 'relative';
-        handle.style.zIndex = '1000';
-        handle.style.cursor = 'col-resize';
-        handle.style.minHeight = '100%';
-        handle.style.width = '6px';
-        handle.style.flexShrink = '0';
+        handle.style.cssText = `
+            opacity: 0.8;
+            position: relative;
+            z-index: 1000;
+            cursor: col-resize;
+            min-height: 100%;
+            width: 6px;
+            flex-shrink: 0;
+        `;
         handle.title = 'Drag to resize | Double-click to auto-size';
         
-        console.log('✅ Resize handle created and event listeners attached');
         return handle;
     }
 
     startResize(e, handle) {
-        console.log('🚀 Starting resize operation');
+        if (this.maximizedPane) {
+            console.log('⚠️ Resize blocked - pane is maximized');
+            return;
+        }
+        
         e.preventDefault();
         this.isResizing = true;
         this.currentHandle = handle;
         
         const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
         this.startX = clientX;
+        this.leftPaneStartWidth = handle.leftPane.offsetWidth;
+        this.rightPaneStartWidth = handle.rightPane.offsetWidth;
         
-        // Store the initial widths of the two panes being resized
-        this.leftPaneStartWidth = this.currentHandle.leftPane.offsetWidth;
-        this.rightPaneStartWidth = this.currentHandle.rightPane.offsetWidth;
-        
-        console.log(`📊 Start widths - Left: ${this.leftPaneStartWidth}px, Right: ${this.rightPaneStartWidth}px`);
-
         document.body.classList.add('resizing');
         handle.classList.add('dragging');
         this.showWidthTooltip(e);
     }
 
     handleResize(e) {
-        if (!this.isResizing) return;
+        if (!this.isResizing || this.maximizedPane) return;
         
         e.preventDefault();
         const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
@@ -207,46 +338,35 @@ class ResizablePanes {
 
         const leftPane = this.currentHandle.leftPane;
         const rightPane = this.currentHandle.rightPane;
-
-        const minWidth = 250; // Minimum pane width
+        const minWidth = 250;
         
-        let newLeftWidth = this.leftPaneStartWidth + deltaX;
-        let newRightWidth = this.rightPaneStartWidth - deltaX;
-
-        // Enforce minimum width constraints
-        if (newLeftWidth < minWidth) {
-            newRightWidth += newLeftWidth - minWidth;
-            newLeftWidth = minWidth;
+        let newLeftWidth = Math.max(minWidth, this.leftPaneStartWidth + deltaX);
+        let newRightWidth = Math.max(minWidth, this.rightPaneStartWidth - deltaX);
+        
+        // Ensure minimum widths
+        const totalWidth = newLeftWidth + newRightWidth;
+        const requiredWidth = this.leftPaneStartWidth + this.rightPaneStartWidth;
+        
+        if (totalWidth !== requiredWidth) {
+            const ratio = requiredWidth / totalWidth;
+            newLeftWidth *= ratio;
+            newRightWidth *= ratio;
         }
-        if (newRightWidth < minWidth) {
-            newLeftWidth += newRightWidth - minWidth;
-            newRightWidth = minWidth;
-        }
 
-        // Override flex with explicit width
         leftPane.style.width = `${newLeftWidth}px`;
         leftPane.style.flex = 'none';
         rightPane.style.width = `${newRightWidth}px`;
         rightPane.style.flex = 'none';
         
         this.updateWidthTooltip(e, newLeftWidth, newRightWidth);
-        
-        // Debug logging (only every 10th resize event to avoid spam)
-        if (Math.abs(deltaX) % 10 < 2) {
-            console.log(`📏 Resizing - Delta: ${deltaX}px, Left: ${newLeftWidth}px, Right: ${newRightWidth}px`);
-        }
     }
 
     stopResize() {
         if (!this.isResizing) return;
         
-        console.log('🛑 Stopping resize operation');
-
-        // Call the callback to save widths
         if (this.currentHandle && this.onResizeEnd) {
             const leftPane = this.currentHandle.leftPane;
             const rightPane = this.currentHandle.rightPane;
-            console.log(`💾 Saving widths - Left: ${leftPane.offsetWidth}px, Right: ${rightPane.offsetWidth}px`);
             this.onResizeEnd(leftPane.id, leftPane.offsetWidth);
             this.onResizeEnd(rightPane.id, rightPane.offsetWidth);
         }
@@ -257,21 +377,17 @@ class ResizablePanes {
             this.currentHandle.classList.remove('dragging');
         }
         this.currentHandle = null;
-        
         this.hideWidthTooltip();
-        console.log('✅ Resize operation completed');
     }
 
     autoSize(e, handle) {
-        console.log('⚖️ Auto-sizing panes');
+        if (this.maximizedPane) return;
+        
         e.preventDefault();
         const leftPane = handle.leftPane;
         const rightPane = handle.rightPane;
-        
         const totalWidth = leftPane.offsetWidth + rightPane.offsetWidth;
         const equalWidth = Math.floor(totalWidth / 2);
-        
-        console.log(`📊 Total width: ${totalWidth}px, Equal width: ${equalWidth}px`);
 
         leftPane.style.width = `${equalWidth}px`;
         leftPane.style.flex = 'none';
@@ -282,12 +398,9 @@ class ResizablePanes {
             this.onResizeEnd(leftPane.id, equalWidth);
             this.onResizeEnd(rightPane.id, equalWidth);
         }
-        
-        console.log('✅ Auto-size completed');
     }
 
-    // --- Tooltip Methods ---
-
+    // Tooltip methods
     showWidthTooltip(e) {
         const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
         this.tooltip.style.left = `${clientX + 15}px`;
@@ -304,5 +417,17 @@ class ResizablePanes {
 
     hideWidthTooltip() {
         this.tooltip.classList.remove('visible');
+    }
+
+    // Cleanup method
+    destroy() {
+        document.removeEventListener('mousemove', this.handleResizeEvent);
+        document.removeEventListener('mouseup', this.stopResizeEvent);
+        document.removeEventListener('touchmove', this.handleResizeEvent);
+        document.removeEventListener('touchend', this.stopResizeEvent);
+        
+        if (this.tooltip && this.tooltip.parentNode) {
+            this.tooltip.parentNode.removeChild(this.tooltip);
+        }
     }
 }
