@@ -2,6 +2,8 @@
   "defaultNotes": [
     "welcome.md",
     "python-in-notes.md",
-    "custom-deploy.md"
+    "custom-deploy.md",
+    "what-is-pkm.md",
+    "connecting-ideas.md"
   ]
 }
