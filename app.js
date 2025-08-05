@@ -1,4 +1,3 @@
-//app.js
 import { PyodideManager } from './pyodideManager.js';
 import { Note } from './note.js';
 import { BacklinksManager } from './backlinks.js';
@@ -16,8 +15,6 @@ class PKMApp {
         this.panes = storage.get('pkm_panes', []);
         this.focusedPaneId = storage.get('pkm_focused_pane', null);
         
-        // Default note creation is now handled in the async init() method.
-
         this.paneWidths = new Map(storage.get('pkm_pane_widths', []));
 
         this.backlinksManager = new BacklinksManager(this.notes);
@@ -29,7 +26,6 @@ class PKMApp {
         this.graphManager.onNodeClick = (noteId) => this.openNote(noteId);
         this.resizablePanes = null;
 
-        // The init method is now async
         this.init();
     }
     
@@ -38,7 +34,7 @@ class PKMApp {
             const statusEl = document.getElementById('pyodideStatus');
             const textEl = statusEl.querySelector('.status-text');
             if (!statusEl || !textEl) return;
-            statusEl.className = 'pyodide-status'; // Reset classes
+            statusEl.className = 'pyodide-status';
             statusEl.classList.add(status);
             textEl.textContent = message;
         });
@@ -59,14 +55,12 @@ class PKMApp {
     }
 
     async init() {
-        // --- MODIFIED: Default note loading is now async and happens here ---
         if (Object.keys(this.notes).length === 0) {
             const hasLoadedBefore = storage.get('pkm_has_loaded_before', false);
             if (!hasLoadedBefore) {
                 console.log("First time load: creating default notes from external files.");
                 this.notes = await this.createDefaultNotes();
                 this.saveNotes();
-                // Update managers with the newly loaded notes
                 this.backlinksManager.updateNotes(this.notes);
                 this.graphManager.updateNotes(this.notes);
                 storage.set('pkm_has_loaded_before', true);
@@ -99,7 +93,6 @@ class PKMApp {
     async createDefaultNotes() {
         const notes = {};
         try {
-            // Step 1: Fetch the manifest file that lists all the default notes.
             const manifestResponse = await fetch('content/manifest.json');
             if (!manifestResponse.ok) {
                 throw new Error(`Failed to fetch manifest.json: ${manifestResponse.statusText}`);
@@ -112,7 +105,6 @@ class PKMApp {
                 return {};
             }
 
-            // Step 2: Create an array of fetch promises for each note file.
             const fetchPromises = noteFiles.map(filename => 
                 fetch(`content/${filename}`)
                     .then(response => {
@@ -124,19 +116,11 @@ class PKMApp {
                     })
             );
 
-            // Step 3: Wait for all notes to be fetched.
             const noteContents = await Promise.all(fetchPromises);
 
-            // Step 4: Create a new Note object for each fetched content.
             noteContents.forEach((content) => {
-                // Create the note with a temporary title.
                 const note = new Note("Default Note", content);
-                
-                // --- THIS IS THE FIX ---
-                // Now, immediately call update() to parse the content and extract the
-                // real title from the YAML frontmatter.
                 note.update(content, true); 
-                
                 notes[note.id] = note;
             });
 
@@ -147,7 +131,6 @@ class PKMApp {
         }
         return notes;
     }
-
 
     initResizablePanes() {
         const container = document.getElementById('editorPanesContainer');
@@ -214,7 +197,6 @@ class PKMApp {
         }
     }
     
-    // --- Pane Management Logic ---
     createPane(noteId) {
         const newPane = { id: 'pane_' + Date.now(), noteId: noteId, mode: 'split' };
         this.panes.push(newPane);
@@ -280,7 +262,6 @@ class PKMApp {
         };
     }
     
-    // --- Core Data & UI Actions ---
     createNote() {
         const note = new Note();
         this.notes[note.id] = note;
@@ -305,56 +286,55 @@ class PKMApp {
         this.updateRightSidebar();
     }
 
-    // --- Rendering Logic ---
     renderAllPanes() {
-    const container = document.getElementById('editorPanesContainer');
-    if (this.panes.length === 0) {
-        container.innerHTML = `<div class="empty-state"><h3>Welcome to PKM Notes</h3><p>Select a note or create a new one.</p></div>`;
-        this.updateRightSidebar();
-        return;
-    }
-    
-    container.innerHTML = '';
-    this.panes.forEach((pane) => {
-        const note = this.notes[pane.noteId];
-        if (!note) { 
-            this.closePane(pane.id); 
-            return; 
+        const container = document.getElementById('editorPanesContainer');
+        if (this.panes.length === 0) {
+            container.innerHTML = `<div class="empty-state"><h3>Welcome to PKM Notes</h3><p>Select a note or create a new one.</p></div>`;
+            this.updateRightSidebar();
+            return;
         }
         
-        const paneEl = document.createElement('div');
-        paneEl.className = 'editor-container';
-        paneEl.dataset.paneId = pane.id;
-        paneEl.id = pane.id;
+        container.innerHTML = '';
+        this.panes.forEach((pane) => {
+            const note = this.notes[pane.noteId];
+            if (!note) { 
+                this.closePane(pane.id); 
+                return; 
+            }
+            
+            const paneEl = document.createElement('div');
+            paneEl.className = 'editor-container';
+            paneEl.dataset.paneId = pane.id;
+            paneEl.id = pane.id;
+            
+            if (pane.id === this.focusedPaneId) {
+                paneEl.classList.add('focused');
+            }
+            
+            paneEl.innerHTML = this.getEditorHTML(note, pane);
+            container.appendChild(paneEl);
+            this.bindPaneEvents(paneEl, pane);
+            this.updatePaneContent(paneEl, note);
+            
+            const savedWidth = this.paneWidths.get(pane.id) || 450;
+            paneEl.style.width = `${savedWidth}px`;
+            paneEl.style.flex = 'none';
+        });
         
-        if (pane.id === this.focusedPaneId) {
-            paneEl.classList.add('focused');
+        if (!this.resizablePanes && this.panes.length > 0) {
+            this.initResizablePanes();
         }
         
-        paneEl.innerHTML = this.getEditorHTML(note, pane);
-        container.appendChild(paneEl);
-        this.bindPaneEvents(paneEl, pane);
-        this.updatePaneContent(paneEl, note);
-        
-        const savedWidth = this.paneWidths.get(pane.id) || 450;
-        paneEl.style.width = `${savedWidth}px`;
-        paneEl.style.flex = 'none';
-    });
-    
-    if (!this.resizablePanes && this.panes.length > 0) {
-        this.initResizablePanes();
-    }
-    
-    if (this.resizablePanes) {
-        this.resizablePanes.update();
-        
-        if (!this.resizablePanes.isMaximized()) {
-            this.resizablePanes.applyStoredWidths(this.paneWidths);
+        if (this.resizablePanes) {
+            this.resizablePanes.update();
+            
+            if (!this.resizablePanes.isMaximized()) {
+                this.resizablePanes.applyStoredWidths(this.paneWidths);
+            }
         }
+        
+        this.savePanes();
     }
-    
-    this.savePanes();
-}
 
     getEditorHTML(note, pane) {
         return `
@@ -496,6 +476,64 @@ class PKMApp {
         
         this.bindPreviewEvents(paneEl, note);
     }
+    
+    // --- CORRECTLY PLACED HELPER METHODS ---
+    base64ToBlob(base64, contentType = 'image/png', sliceSize = 512) {
+        const byteCharacters = atob(base64);
+        const byteArrays = [];
+        for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+            const slice = byteCharacters.slice(offset, offset + sliceSize);
+            const byteNumbers = new Array(slice.length);
+            for (let i = 0; i < slice.length; i++) {
+                byteNumbers[i] = slice.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            byteArrays.push(byteArray);
+        }
+        return new Blob(byteArrays, { type: contentType });
+    }
+
+    async copyTextToClipboard(text, buttonElement) {
+        try {
+            await navigator.clipboard.writeText(text);
+            if (buttonElement) {
+                buttonElement.textContent = 'Copied!';
+            }
+        } catch (err) {
+            console.warn('Async clipboard API failed, falling back to execCommand.', err);
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.top = '0';
+            textArea.style.left = '0';
+            textArea.style.opacity = '0';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                const successful = document.execCommand('copy');
+                if (buttonElement) {
+                    buttonElement.textContent = successful ? 'Copied!' : 'Error';
+                }
+            } catch (err) {
+                console.error('Fallback copy command failed.', err);
+                if (buttonElement) {
+                    buttonElement.textContent = 'Error';
+                }
+            }
+            document.body.removeChild(textArea);
+        } finally {
+            if (buttonElement) {
+                setTimeout(() => {
+                    if (buttonElement.classList.contains('copy-output-btn')) {
+                         buttonElement.textContent = 'Copy Text';
+                    } else if (buttonElement.classList.contains('copy-plot-btn')) {
+                         buttonElement.textContent = 'Copy Image';
+                    }
+                }, 2000);
+            }
+        }
+    }
 
     bindPreviewEvents(paneEl, note) {
         let codeBlockIndex = 0;
@@ -523,31 +561,72 @@ class PKMApp {
                 try {
                     const execResult = await this.pyodideManager.executeCode(code, note.id, currentBlockIndex);
                     
-                    const outputHtml = this.pyodideManager.formatOutput(execResult.result, execResult.stdout, execResult.executionNumber, execResult.plots);
-                    outputEl.innerHTML = outputHtml;
+                    const formattedOutput = this.pyodideManager.formatOutput(execResult.result, execResult.stdout, execResult.executionNumber, execResult.plots);
+                    outputEl.innerHTML = formattedOutput.html;
 
                     const noteOutputs = this.codeBlockOutputs.get(note.id) || new Map();
-                    noteOutputs.set(currentBlockIndex, outputHtml);
-                    this.codeBlockOutputs.set(note.id, noteOutputs);                    
-                    
+                    noteOutputs.set(currentBlockIndex, formattedOutput.html);
+                    this.codeBlockOutputs.set(note.id, noteOutputs);
+
+                    outputEl.addEventListener('click', async (event) => {
+                        const target = event.target;
+
+                        if (target.matches('.copy-output-btn')) {
+                            if (formattedOutput.rawText) {
+                                this.copyTextToClipboard(formattedOutput.rawText, target);
+                            } else {
+                                target.textContent = 'No Text';
+                                setTimeout(() => { target.textContent = 'Copy Text'; }, 2000);
+                            }
+                        }
+
+                        if (target.matches('.copy-plot-btn')) {
+                            const base64 = target.dataset.plotBase64;
+                            try {
+                                const blob = this.base64ToBlob(base64);
+                                await navigator.clipboard.write([
+                                    new ClipboardItem({ 'image/png': blob })
+                                ]);
+                                target.textContent = 'Copied!';
+                                setTimeout(() => { target.textContent = 'Copy Image'; }, 2000);
+                            } catch (err) {
+                                console.error('Failed to copy image to clipboard:', err);
+                                target.textContent = 'Error!';
+                                setTimeout(() => { target.textContent = 'Copy Image'; }, 2000);
+                            }
+                        }
+
+                        // --- MODIFIED: Reliable Download Logic ---
+                        if (target.matches('.download-plot-btn')) {
+                            const base64 = target.dataset.plotBase64;
+                            const filename = target.dataset.filename;
+                            const blob = this.base64ToBlob(base64);
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            
+                            a.href = url;
+                            a.download = filename;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                        }
+                    });
+
                 } catch (error) {
                     console.error('Python execution error:', error);
-                    
                     let errorMessage = error.message || error.toString();
-                    
                     if (errorMessage.includes('NetworkError') || errorMessage.includes('fetch')) {
-                        errorMessage = 'Network error: Could not fetch data from the specified URL. Check the URL and your internet connection.';
+                        errorMessage = 'Network error: Could not fetch data. Check the URL and your connection.';
                     } else if (errorMessage.includes('SyntaxError')) {
                         errorMessage = `Python syntax error: ${errorMessage}`;
                     } else if (errorMessage.includes('NameError')) {
-                        errorMessage = `Variable not found: ${errorMessage}\n\nTip: Make sure to run previous code blocks that define variables first.`;
+                        errorMessage = `Variable not found: ${errorMessage}`;
                     }
-                    
                     outputEl.innerHTML = `<pre class="output-error">${this.escapeHtml(errorMessage)}</pre>`;
                     const noteOutputs = this.codeBlockOutputs.get(note.id) || new Map();
                     noteOutputs.set(currentBlockIndex, outputEl.innerHTML);
-                    this.codeBlockOutputs.set(note.id, noteOutputs);
-                    
+                    this.codeBlockOutputs.set(note.id, noteOutputs);                  
                 } finally {
                     newButton.disabled = false;
                     newButton.textContent = '▶ Run';
@@ -559,11 +638,7 @@ class PKMApp {
             link.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const linkText = link.dataset.link;
-                
-                const targetNote = Object.values(this.notes).find(n => 
-                    n.title.toLowerCase() === linkText.toLowerCase()
-                );
-                
+                const targetNote = Object.values(this.notes).find(n => n.title.toLowerCase() === linkText.toLowerCase());
                 if (targetNote) {
                     this.openNote(targetNote.id);
                 } else {
@@ -579,7 +654,6 @@ class PKMApp {
         return div.innerHTML;
     }
 
-    // --- Right Sidebar ---
     updateRightSidebar() {
         const rightSidebar = document.getElementById('rightSidebar');
         const container = rightSidebar.querySelector('.right-sidebar-content');
@@ -642,7 +716,6 @@ class PKMApp {
         });
     }
 
-    // --- Network Data Export Method ---
     exportNetworkData(noteId) {
         const exportMenu = document.createElement('div');
         exportMenu.className = 'context-menu';
@@ -745,7 +818,6 @@ class PKMApp {
         }, 400);
     }
 
-    // --- Context Menu & Note List Sidebar ---
     renderNoteList() {
         const noteList = document.getElementById('noteList');
         const sortedNotes = Object.values(this.notes).sort((a, b) => b.modified - a.modified);
@@ -895,7 +967,6 @@ class PKMApp {
         textarea.focus();
     }
 
-    // --- Search functionality ---
     searchNotes(query) {
         const noteList = document.getElementById('noteList');
         const items = noteList.querySelectorAll('.note-item');
@@ -916,7 +987,6 @@ class PKMApp {
         });
     }
     
-    // --- Save, Import, Export, and other utilities ---
     saveNotes() { 
         storage.set('pkm_notes', this.notes); 
     }
@@ -1215,7 +1285,6 @@ class PKMApp {
 }
 }
 
-// --- MODIFIED: The DOMContentLoaded now correctly handles the async init ---
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new PKMApp();
 });

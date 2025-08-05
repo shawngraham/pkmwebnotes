@@ -8,6 +8,12 @@ tags: [python, code, tutorial]
 
 You can run Python code blocks directly in your notes. This is powered by [Pyodide](https://pyodide.org/), which brings a full Python environment to your browser. The status of the Python environment is shown in the header.
 
+You write your code in the markdown note. To **execute** your code, switch to `split` or `preview` and hit the `run` button.
+
+Use the `copy` button to copy results. I would suggest pasting these into a NEW note that you link back to your code note.
+
+Plots can be copied or downloaded; copied plots are in your computer's clipboard and can be pasted into Word etc.
+
 ## Basic Example
 
 Here's a simple Python code block. Click the "▶ Run" button in the preview pane to execute it. The output will be numbered.
@@ -73,12 +79,19 @@ plt.show()
 You can load data from URLs using the special \`#data_url:\` directive:
 
 ```python
+#data_url: https://gist.githubusercontent.com/shawngraham/f0678127cbe4425f180b242eecaa3bb2/raw/98defb3a88db1b8e75f006c007adba6e333cb4a2/shopping.csv 
 # The fetched data is available in the 'fetched_data' variable
 df = pd.read_csv(StringIO(fetched_data))
 print(f"Loaded {len(df)} rows of data")
 print("\nFirst 5 rows:")
 df.head()
 ```
+This uses a 'bridge' in the background that functions a bit like 'curl' in order to read data into your sandbox. Otherwise you couldn't load external data. Use gist.github.com and make your data 'secret' if you don't want it findable; then use the url behind the 'raw' button there and paste in as in the example.
+
+## Your Results
+
+
+
 
 ## Important Notes
 

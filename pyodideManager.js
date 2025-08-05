@@ -226,56 +226,70 @@ plt.show = _original_show
 
     formatOutput(result, stdout, executionNumber, plots) {
         let outputHtml = '';
-        
-        // Add execution info
-        outputHtml += `<div class="execution-info"><span class="execution-number">[${executionNumber}]</span> <span>Executed</span></div>`;
+        let rawText = ''; // <-- ADD: Variable to hold raw text for copying
+
+        // Add execution info (not included in raw text)
+        outputHtml += `<div class="output-header">
+            <div class="execution-info"><span class="execution-number">[${executionNumber}]</span> <span>Executed</span></div>
+            <button class="copy-output-btn" title="Copy output to clipboard">Copy</button>
+        </div>`;
         
         // Add stdout if present
         if (stdout) {
             outputHtml += `<div class="output-label">Output:</div>`;
             outputHtml += `<pre class="output-text">${this.escapeHtml(stdout)}</pre>`;
+            rawText += stdout + '\n'; 
         }
         
-        // Add plots if present
-        if (plots && plots.length > 0) {
+        // Add plots if present (cannot be copied as text, so we add a note)
+                if (plots && plots.length > 0) {
             plots.forEach((plotBase64, index) => {
+                outputHtml += `<div class="plot-container">`;
                 if (plots.length > 1) {
                     outputHtml += `<div class="output-label">Plot ${index + 1}:</div>`;
                 }
                 outputHtml += `<img src="data:image/png;base64,${plotBase64}" alt="Plot ${index + 1}" />`;
+                // Add the new action buttons for each plot
+                outputHtml += `<div class="plot-actions">
+                    <button class="copy-plot-btn" title="Copy image to clipboard" data-plot-base64="${plotBase64}">Copy Image</button>
+                    <button class="download-plot-btn" title="Download image as PNG" data-plot-base64="${plotBase64}" data-filename="plot_${executionNumber}_${index + 1}.png">Download</button>
+                </div>`;
+                outputHtml += `</div>`;
             });
         }
         
-        // Add result if present
         if (result !== undefined && result !== null) {
+            let resultStr = '';
             try {
-                // Check if the result is a Pandas DataFrame or other object with a to_html method
                 if (typeof result.to_html === 'function') {
                     outputHtml += `<div class="output-label">Result:</div>`;
                     outputHtml += result.to_html();
-                    result.destroy(); // Clean up pyodide proxy
-                } 
-                // Fall back to a string representation for other types
-                else if (typeof result.toString === 'function') {
-                    const resultStr = result.toString();
+                    resultStr = result.to_string ? result.to_string() : String(result);
+                    result.destroy(); 
+                } else if (typeof result.toString === 'function') {
+                    resultStr = result.toString();
                     if (resultStr !== 'undefined' && resultStr.trim() !== '') {
                         outputHtml += `<div class="output-label">Result:</div>`;
                         outputHtml += `<pre class="output-result">${this.escapeHtml(resultStr)}</pre>`;
                     }
                 }
-            } catch (error) {
-                console.warn("Error formatting result:", error);
-                outputHtml += `<pre class="output-result">${this.escapeHtml(String(result))}</pre>`;
+            } catch (error) { /* ... */ }
+            if (resultStr.trim() !== '') {
+                 rawText += `Result:\n${resultStr}`;
             }
         }
         
-        // Provide default success message if there's no other output
-        return outputHtml || "<pre>Code executed successfully.</pre>";
+        const finalHtml = outputHtml || "<pre>Code executed successfully.</pre>";
+        
+        return {
+            html: finalHtml,
+            rawText: rawText.trim()
+        };
     }
 
-    escapeHtml(text) {
+       escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
-}
+} 
