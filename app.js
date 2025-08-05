@@ -1,3 +1,4 @@
+//app.js
 import { PyodideManager } from './pyodideManager.js';
 import { Note } from './note.js';
 import { BacklinksManager } from './backlinks.js';
@@ -15,18 +16,7 @@ class PKMApp {
         this.panes = storage.get('pkm_panes', []);
         this.focusedPaneId = storage.get('pkm_focused_pane', null);
         
-        // Check for first-time load and create default notes if needed
-        if (Object.keys(this.notes).length === 0) {
-            const hasLoadedBefore = storage.get('pkm_has_loaded_before', false);
-            if (!hasLoadedBefore) {
-                console.log("First time load: creating default notes.");
-                this.notes = this.createDefaultNotes();
-                this.saveNotes();
-                storage.set('pkm_has_loaded_before', true);
-            }
-        }
-
-
+        // Default note creation is now handled in the async init() method.
 
         this.paneWidths = new Map(storage.get('pkm_pane_widths', []));
 
@@ -38,6 +28,8 @@ class PKMApp {
         
         this.graphManager.onNodeClick = (noteId) => this.openNote(noteId);
         this.resizablePanes = null;
+
+        // The init method is now async
         this.init();
     }
     
@@ -66,7 +58,21 @@ class PKMApp {
         return notes;
     }
 
-    init() {
+    async init() {
+        // --- MODIFIED: Default note loading is now async and happens here ---
+        if (Object.keys(this.notes).length === 0) {
+            const hasLoadedBefore = storage.get('pkm_has_loaded_before', false);
+            if (!hasLoadedBefore) {
+                console.log("First time load: creating default notes from external files.");
+                this.notes = await this.createDefaultNotes();
+                this.saveNotes();
+                // Update managers with the newly loaded notes
+                this.backlinksManager.updateNotes(this.notes);
+                this.graphManager.updateNotes(this.notes);
+                storage.set('pkm_has_loaded_before', true);
+            }
+        }
+
         this.setupTheme();
         this.bindPyodideStatus();
         this.bindGlobalEvents();
@@ -90,156 +96,58 @@ class PKMApp {
         });
     }
 
-     createDefaultNotes() {
+    async createDefaultNotes() {
         const notes = {};
+        try {
+            // Step 1: Fetch the manifest file that lists all the default notes.
+            const manifestResponse = await fetch('content/manifest.json');
+            if (!manifestResponse.ok) {
+                throw new Error(`Failed to fetch manifest.json: ${manifestResponse.statusText}`);
+            }
+            const manifest = await manifestResponse.json();
+            const noteFiles = manifest.defaultNotes;
 
-        const welcomeNoteContent = `---
-title: Welcome to PKM WebNotes
-created: ${new Date().toISOString()}
-tags: [welcome, getting-started]
----
+            if (!noteFiles || noteFiles.length === 0) {
+                console.warn("No default notes listed in manifest.json");
+                return {};
+            }
 
-# 👋 Welcome to PKM WebNotes
+            // Step 2: Create an array of fetch promises for each note file.
+            const fetchPromises = noteFiles.map(filename => 
+                fetch(`content/${filename}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            console.error(`Failed to fetch ${filename}: ${response.statusText}`);
+                            return `# Error\n\nFailed to load content for ${filename}.`;
+                        }
+                        return response.text();
+                    })
+            );
 
-This is your personal knowledge management system in the browser.
+            // Step 3: Wait for all notes to be fetched.
+            const noteContents = await Promise.all(fetchPromises);
 
-## Key Features
+            // Step 4: Create a new Note object for each fetched content.
+            noteContents.forEach((content) => {
+                // Create the note with a temporary title.
+                const note = new Note("Default Note", content);
+                
+                // --- THIS IS THE FIX ---
+                // Now, immediately call update() to parse the content and extract the
+                // real title from the YAML frontmatter.
+                note.update(content, true); 
+                
+                notes[note.id] = note;
+            });
 
-- **Markdown Editor**: Write notes using simple markdown syntax.
-- **Wikilinks**: Connect your ideas by creating links between notes with [[Note Title]].
-- **Backlinks**: See which notes link to your current note in the right sidebar.
-- **Graph View**: Visualize the connections between your notes.
-- **Python Execution**: Run Python code directly within your notes! See the [[Python in Notes]] note for details.
-
-## Getting Started
-
-1.  **Create a new note**: Click the "+ New Note" button.
-2.  **Start writing**: Use the editor in the central pane.
-3.  **Create a link**: Type [[ and start typing a note title. An autocomplete will appear. Try linking to [[Python in Notes]].`;
-
-        const pythonNoteContent = `---
-title: Python in Notes
-created: ${new Date().toISOString()}
-tags: [python, code, tutorial]
----
-
-# 🐍 Executing Python in Your Notes
-
-You can run Python code blocks directly in your notes. This is powered by [Pyodide](https://pyodide.org/), which brings a full Python environment to your browser. The status of the Python environment is shown in the header.
-
-## Basic Example
-
-Here's a simple Python code block. Click the "▶ Run" button in the preview pane to execute it. The output will be numbered.
-
-\`\`\`python
-import sys
-print(f"Hello from Python {sys.version}!")
-
-# The last expression in a cell is automatically displayed as the result
-a = 10
-b = 20
-a + b
-\`\`\`
-
-## Data Analysis with Pandas
-
-The environment comes with \`pandas\` and \`numpy\` pre-installed. You can perform data analysis right here.
-
-\`\`\`python
-import pandas as pd
-from io import StringIO
-
-# Create a sample dataset
-csv_data = """
-fruit,quantity,color
-apple,12,red
-banana,18,yellow
-grape,30,purple
-"""
-
-# Read it into a DataFrame
-df = pd.read_csv(StringIO(csv_data))
-
-# Display the DataFrame
-df
-\`\`\`
-
-## Creating Plots
-
-You can also generate plots using \`matplotlib\`. Any plots created will be displayed as images below the code cell.
-
-\`\`\`python
-import matplotlib.pyplot as plt
-import numpy as np
-
-# Generate some data
-x = np.linspace(0, 10, 100)
-y = np.sin(x)
-
-# Create a plot
-fig, ax = plt.subplots()
-ax.plot(x, y)
-ax.set_title("A Simple Sine Wave")
-ax.set_xlabel("x")
-ax.set_ylabel("sin(x)")
-
-# The plot will be captured and displayed automatically
-plt.show()
-\`\`\`
-
-## Loading External Data
-
-You can load data from URLs using the special \`#data_url:\` directive:
-
-\`\`\`python
-#data_url: https://raw.githubusercontent.com/mwaskom/seaborn-data/master/tips.csv
-import pandas as pd
-from io import StringIO
-
-# The fetched data is available in the 'fetched_data' variable
-df = pd.read_csv(StringIO(fetched_data))
-print(f"Loaded {len(df)} rows of data")
-print("\nFirst 5 rows:")
-df.head()
-\`\`\`
-
-## Important Notes
-
-- Each note maintains its own Python environment
-- Variables persist between code cells in the same note
-- The execution counter [n] shows the order of execution
-- First execution may take a few seconds while Pyodide loads
-- Check the Python status indicator in the header (🐍)
-
-## Available Libraries
-
-The following libraries are pre-installed:
-- pandas
-- numpy  
-- matplotlib
-- json
-- csv
-- micropip (for installing additional packages)
-
-You can install with micropip like this:
-
-\'\'\'
-await micropip.install("networkx")
-\'\'\'
-
-Happy coding! 🐍
-
-
-`;
-
-        const welcomeNote = new Note("Welcome to PKM WebNotes", welcomeNoteContent);
-        const pythonNote = new Note("Python in Notes", pythonNoteContent);
-        
-        notes[welcomeNote.id] = welcomeNote;
-        notes[pythonNote.id] = pythonNote;
-
+        } catch (error) {
+            console.error("Error creating default notes:", error);
+            const errorNote = new Note("Error Loading Notes", "There was an issue loading the default notes. Please check 'content/manifest.json' and the browser console for details.");
+            notes[errorNote.id] = errorNote;
+        }
         return notes;
     }
+
 
     initResizablePanes() {
         const container = document.getElementById('editorPanesContainer');
@@ -264,9 +172,7 @@ Happy coding! 🐍
         document.getElementById('searchInput').addEventListener('input', debounce((e) => this.searchNotes(e.target.value), 300));
         document.getElementById('fileInput').addEventListener('change', (e) => this.handleFileImport(e));
         
-        // Add keyboard shortcuts for maximize/minimize functionality
         document.addEventListener('keydown', (e) => {
-            // Ctrl/Cmd + M to toggle maximize for focused pane
             if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
                 e.preventDefault();
                 if (this.focusedPaneId && this.resizablePanes) {
@@ -274,13 +180,11 @@ Happy coding! 🐍
                 }
             }
             
-            // Ctrl/Cmd + Shift + R to reset all pane widths
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'R') {
                 e.preventDefault();
                 this.resetPaneWidths();
             }
             
-            // Escape to restore from maximized state
             if (e.key === 'Escape' && this.resizablePanes && this.resizablePanes.isMaximized()) {
                 this.resizablePanes.restoreFromMaximized();
             }
@@ -291,7 +195,6 @@ Happy coding! 🐍
         if (this.panes.length > 0) {
             this.renderAllPanes();
             
-            // Restore maximize state after a short delay to ensure DOM is ready
             setTimeout(() => {
                 const maximizedPaneId = storage.get('pkm_maximized_pane', null);
                 if (maximizedPaneId && this.resizablePanes) {
@@ -368,7 +271,6 @@ Happy coding! 🐍
         }
     }
     
-    // Get maximize status for external use
     getPaneMaximizeStatus() {
         if (!this.resizablePanes) return null;
         
@@ -434,24 +336,18 @@ Happy coding! 🐍
         this.bindPaneEvents(paneEl, pane);
         this.updatePaneContent(paneEl, note);
         
-        // Apply width
         const savedWidth = this.paneWidths.get(pane.id) || 450;
         paneEl.style.width = `${savedWidth}px`;
         paneEl.style.flex = 'none';
     });
     
-    // IMPORTANT: Initialize ResizablePanes AFTER panes are created
     if (!this.resizablePanes && this.panes.length > 0) {
-        console.log('Initializing ResizablePanes after panes creation');
         this.initResizablePanes();
     }
     
-    // Update resize handles and maximize buttons
     if (this.resizablePanes) {
-        console.log('Calling resizablePanes.update()');
         this.resizablePanes.update();
         
-        // Apply stored widths if not maximized
         if (!this.resizablePanes.isMaximized()) {
             this.resizablePanes.applyStoredWidths(this.paneWidths);
         }
@@ -541,7 +437,6 @@ Happy coding! 🐍
 
         let content = note.getContentWithoutMetadata();
 
-        // Handle block embeds
         content = content.replace(/!\[\[([^#\]]+)#\^([^\]]+)\]\]/g, (match, noteTitle, blockId) => {
             const targetNote = Object.values(this.notes).find(n => 
                 n.title.toLowerCase() === noteTitle.trim().toLowerCase()
@@ -557,11 +452,10 @@ Happy coding! 🐍
             return `<div class="broken-embed">Note "${noteTitle}" not found</div>`;
         });
 
-        // Split content by Python code blocks
         const codeBlockRegex = /(```python\n[\s\S]*?\n```)/g;
         const parts = content.split(codeBlockRegex);
 
-        let codeBlockIndex = 0; // <-- Add a counter for code blocks
+        let codeBlockIndex = 0;
 
         const finalHtmlParts = parts.map((part) => {
             if (part.startsWith('```python')) {
@@ -596,21 +490,17 @@ Happy coding! 🐍
 
         previewContentEl.innerHTML = finalHtmlParts.join('');
         
-        // Highlight non-Python code blocks
         previewContentEl.querySelectorAll('pre code:not(.language-python)').forEach(block => {
             hljs.highlightBlock(block);
         });
         
-        // Bind events
         this.bindPreviewEvents(paneEl, note);
     }
 
     bindPreviewEvents(paneEl, note) {
-        // Bind code execution buttons
         let codeBlockIndex = 0;
         paneEl.querySelectorAll('.run-btn').forEach(button => {
-            const currentBlockIndex = codeBlockIndex++; // Capture the index for this button
-            // Remove existing listeners to prevent duplicates
+            const currentBlockIndex = codeBlockIndex++;
             const newButton = button.cloneNode(true);
             button.parentNode.replaceChild(newButton, button);
             
@@ -626,20 +516,16 @@ Happy coding! 🐍
 
                 const code = codeElement.textContent;
                 
-                // Show loading state
                 outputEl.innerHTML = '<div class="spinner">⏳ Executing Python code...</div>';
                 newButton.disabled = true;
                 newButton.textContent = '⏳ Running...';
 
                 try {
-                    // Execute the code using PyodideManager, passing the block index
                     const execResult = await this.pyodideManager.executeCode(code, note.id, currentBlockIndex);
                     
-                    // Format and display output
                     const outputHtml = this.pyodideManager.formatOutput(execResult.result, execResult.stdout, execResult.executionNumber, execResult.plots);
                     outputEl.innerHTML = outputHtml;
 
-                    // Store the output
                     const noteOutputs = this.codeBlockOutputs.get(note.id) || new Map();
                     noteOutputs.set(currentBlockIndex, outputHtml);
                     this.codeBlockOutputs.set(note.id, noteOutputs);                    
@@ -649,7 +535,6 @@ Happy coding! 🐍
                     
                     let errorMessage = error.message || error.toString();
                     
-                    // Make error messages more user-friendly
                     if (errorMessage.includes('NetworkError') || errorMessage.includes('fetch')) {
                         errorMessage = 'Network error: Could not fetch data from the specified URL. Check the URL and your internet connection.';
                     } else if (errorMessage.includes('SyntaxError')) {
@@ -670,7 +555,6 @@ Happy coding! 🐍
             });
         });
 
-        // Bind wiki link clicks
         paneEl.querySelectorAll('.wikilink').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -689,7 +573,6 @@ Happy coding! 🐍
         });
     }
 
-    // ADD this utility method
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
@@ -915,7 +798,6 @@ Happy coding! 🐍
         let menuItems = '';
 
         if (noteId) {
-            // Check if this note is in a maximized pane
             const pane = this.panes.find(p => p.noteId === noteId);
             const isMaximized = this.resizablePanes && this.resizablePanes.getMaximizedPane() === pane?.id;
             
@@ -971,57 +853,47 @@ Happy coding! 🐍
     }
 
     handleAutocomplete(textarea, autocompleteManager, onSelectCallback) {
-    const cursorPos = textarea.selectionStart;
-    const textBeforeCursor = textarea.value.substring(0, cursorPos);
-    
-    // --- MODIFICATION START ---
-    // Use the more robust regex
-    const linkMatch = textBeforeCursor.match(/\[\[([^\]\[]*)$/);
-    
-    if (linkMatch) {
-        // Show the autocomplete menu and provide a callback that includes the original match
-        autocompleteManager.show(textarea, linkMatch, (selectedMatch) => {
-            // Pass BOTH the user's selection and the original regex match
-            onSelectCallback(selectedMatch, linkMatch);
-        });
-    // --- MODIFICATION END ---
-    } else {
-        autocompleteManager.hide();
+        const cursorPos = textarea.selectionStart;
+        const textBeforeCursor = textarea.value.substring(0, cursorPos);
+        
+        const linkMatch = textBeforeCursor.match(/\[\[([^\]\[]*)$/);
+        
+        if (linkMatch) {
+            autocompleteManager.show(textarea, linkMatch, (selectedMatch) => {
+                onSelectCallback(selectedMatch, linkMatch);
+            });
+        } else {
+            autocompleteManager.hide();
+        }
     }
-}
 
     afterAutocomplete(textarea, selectedMatch, originalLinkMatch, onComplete) {
-    const cursorPos = textarea.selectionStart;
-    
-    // Use the originalLinkMatch to determine what text to replace.
-    // originalLinkMatch is the full matched string (e.g., "[[My Li")
-    const queryToReplace = originalLinkMatch;
-    const startOfReplace = cursorPos - queryToReplace.length;
-    
-    const textBefore = textarea.value.substring(0, startOfReplace);
-    const textAfter = textarea.value.substring(cursorPos);
+        const cursorPos = textarea.selectionStart;
+        const queryToReplace = originalLinkMatch;
+        const startOfReplace = cursorPos - queryToReplace.length;
+        
+        const textBefore = textarea.value.substring(0, startOfReplace);
+        const textAfter = textarea.value.substring(cursorPos);
 
-    if (selectedMatch.type === 'create') {
-        const newNote = new Note(selectedMatch.title);
-        this.notes[newNote.id] = newNote;
-        this.graphManager.updateNotes(this.notes);
-        this.saveNotes();
-        this.renderNoteList();
+        if (selectedMatch.type === 'create') {
+            const newNote = new Note(selectedMatch.title);
+            this.notes[newNote.id] = newNote;
+            this.graphManager.updateNotes(this.notes);
+            this.saveNotes();
+            this.renderNoteList();
+        }
+        
+        const replacementText = `[[${selectedMatch.title}]]`;
+        textarea.value = textBefore + replacementText + textAfter;
+        const newCursorPos = startOfReplace + replacementText.length;
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+        
+        if (onComplete) {
+            onComplete();
+        }
+        
+        textarea.focus();
     }
-    
-    // Construct the new value and set the new cursor position
-    const replacementText = `[[${selectedMatch.title}]]`;
-    textarea.value = textBefore + replacementText + textAfter;
-    const newCursorPos = startOfReplace + replacementText.length;
-    textarea.setSelectionRange(newCursorPos, newCursorPos);
-    
-    // Call the onComplete callback to update the preview
-    if (onComplete) {
-        onComplete();
-    }
-    
-    textarea.focus();
-}
 
     // --- Search functionality ---
     searchNotes(query) {
@@ -1054,7 +926,6 @@ Happy coding! 🐍
     }
     
     savePanes() {
-        // Save maximize state along with pane data
         const panesWithState = this.panes.map(pane => ({
             ...pane,
             isMaximized: this.resizablePanes && this.resizablePanes.getMaximizedPane() === pane.id
@@ -1064,7 +935,6 @@ Happy coding! 🐍
         storage.set('pkm_focused_pane', this.focusedPaneId);
         storage.set('pkm_pane_widths', Array.from(this.paneWidths.entries()));
         
-        // Save maximize state
         if (this.resizablePanes) {
             storage.set('pkm_maximized_pane', this.resizablePanes.getMaximizedPane());
         }
@@ -1345,6 +1215,7 @@ Happy coding! 🐍
 }
 }
 
+// --- MODIFIED: The DOMContentLoaded now correctly handles the async init ---
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new PKMApp();
 });
