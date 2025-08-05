@@ -9,8 +9,7 @@
     --success: #059669;
     --warning: #d97706;
     --error: #ef4444;
-
-    /* --- ADDED: Missing Variables for Modals and Buttons --- */
+    --bg-preview: #f0f4f8; 
     --primary-hover: #1d4ed8;
     --bg-primary: var(--background);
     --bg-secondary: var(--surface);
@@ -27,8 +26,7 @@
     --text-muted: #94a3b8;
     --border: #334155;
     --error: #f87171;
-    
-    /* --- ADDED: Dark Theme Variables for Modals --- */
+    --bg-preview: #172133;
     --primary-hover: #60a5fa;
     --bg-primary: var(--surface);
     --bg-secondary: var(--background);
@@ -783,6 +781,7 @@ body {
 .editor-pane,
 .preview-pane {
     overflow-y: auto;
+    background-color: var(--bg-preview);
 }
 
 .editor-pane {

@@ -26,10 +26,37 @@ class PKMApp {
         this.graphManager.onNodeClick = (noteId) => this.openNote(noteId);
         this.resizablePanes = null;
 
+        this.setupMarked();
         this.init();
     }
     
-    // --- (Methods from constructor down to createNote are unchanged) ---
+    // --- CORRECTED: Fixed the tokenizer bug ---
+    setupMarked() {
+        const wikilinkExtension = {
+            name: 'wikilink',
+            level: 'inline',
+            start: (src) => src.indexOf('[['),
+            tokenizer(src) {
+                const rule = /^\[\[([^\]]+)\]\]/;
+                const match = rule.exec(src);
+                if (match) {
+                    return {
+                        type: 'wikilink',
+                        raw: match[0],         // FIX: Was `match`
+                        text: match[1].trim(), // FIX: Was `match.trim()`
+                    };
+                }
+            },
+            renderer(token) {
+                const text = token.text;
+                const exists = this.parser.options.notesMap[text.toLowerCase()];
+                const className = exists ? 'wikilink' : 'wikilink broken';
+                return `<span class="${className}" data-link="${text}">${text}</span>`;
+            }
+        };
+
+        marked.use({ extensions: [wikilinkExtension] });
+    }
     
     bindPyodideStatus() {
         this.pyodideManager.setStatusCallback((status, message) => {
@@ -274,11 +301,23 @@ class PKMApp {
         this.openNoteInNewPane(note.id);
     }
 
-    // --- MODIFIED: deleteNote now uses the custom modal ---
-        async deleteNote(noteId, event = {}) {
-        // --- NEW: Check if we should skip the modal ---
-        // We show the modal if the setting is OFF, OR if the user holds Shift.
-        let confirmed = true; // Assume confirmation if skipping
+    createNoteWithTitle(title) {
+        const existingNote = Object.values(this.notes).find(n => n.title.toLowerCase() === title.toLowerCase());
+        if (existingNote) {
+            this.openNote(existingNote.id);
+            return;
+        }
+        const note = new Note(title);
+        this.notes[note.id] = note;
+        this.backlinksManager.updateNotes(this.notes);
+        this.graphManager.updateNotes(this.notes);
+        this.saveNotes();
+        this.renderNoteList();
+        this.openNoteInNewPane(note.id);
+    }
+
+    async deleteNote(noteId, event = {}) {
+        let confirmed = true;
         let skipFuture = false;
 
         if (!this.settings.skipDeleteConfirm || event.shiftKey) {
@@ -288,30 +327,24 @@ class PKMApp {
                 message: `Are you sure you want to permanently delete "${title}"? This action cannot be undone. <br><br><b>Tip:</b> Hold 'Shift' when clicking 'Delete' to always see this confirmation.`,
                 confirmText: 'Delete',
                 confirmClass: 'danger',
-                showSkipCheckbox: true // Enable our new checkbox
+                showSkipCheckbox: true
             });
-
             confirmed = result.confirmed;
             skipFuture = result.skipFuture;
         }
 
-        // Exit if the user cancelled the modal
         if (!confirmed) return;
 
-        // If the user checked the "skip" box, update and save the settings
         if (skipFuture) {
             this.settings.skipDeleteConfirm = true;
             this.saveSettings();
         }
 
-        // --- The rest of the deletion logic is the same ---
         const focusedPane = this.getPane(this.focusedPaneId);
         if (focusedPane && focusedPane.noteId === noteId) {
             this.focusedPaneId = null;
         }
-
         this.panes = this.panes.filter(p => p.noteId !== noteId);
-
         if (!this.focusedPaneId && this.panes.length > 0) {
             this.focusedPaneId = this.panes[this.panes.length - 1].id;
         }
@@ -319,16 +352,14 @@ class PKMApp {
         delete this.notes[noteId];
         this.backlinksManager.updateNotes(this.notes);
         this.graphManager.updateNotes(this.notes);
-        
         this.saveNotes();
         this.savePanes();
-        
         this.renderNoteList();
         this.renderAllPanes();
         this.updateRightSidebar();
     }
 
-    // --- Custom Promise-based Confirmation Modal ---
+    // --- CORRECTED: Modal HTML generation ---
     _showConfirmationModal(options) {
         return new Promise((resolve) => {
             const { 
@@ -343,7 +374,7 @@ class PKMApp {
             const overlay = document.createElement('div');
             overlay.className = 'confirm-overlay';
 
-                        let skipCheckboxHTML = '';
+            let skipCheckboxHTML = '';
             if (showSkipCheckbox) {
                 skipCheckboxHTML = `
                     <div class="confirm-modal-skip">
@@ -357,7 +388,10 @@ class PKMApp {
             overlay.innerHTML = `
                 <div class="confirm-modal">
                     <div class="confirm-modal-header">${title}</div>
-                    <div class="confirm-modal-body">${message} \n ${skipCheckboxHTML} </div>
+                    <div class="confirm-modal-body">
+                        ${message}
+                        ${skipCheckboxHTML}
+                    </div>
                     <div class="confirm-modal-footer">
                         <button class="confirm-btn secondary" id="confirmCancelBtn">${cancelText}</button>
                         <button class="confirm-btn ${confirmClass}" id="confirmOkBtn">${confirmText}</button>
@@ -395,8 +429,6 @@ class PKMApp {
         });
     }
 
-    // --- (The rest of the file from renderAllPanes onwards is unchanged) ---
-    
     renderAllPanes() {
         const container = document.getElementById('editorPanesContainer');
         if (this.panes.length === 0) {
@@ -522,6 +554,7 @@ class PKMApp {
         this.updatePanePreview(paneEl, note);
     }
 
+    // --- CORRECTED: Removed redundant wikilink replace logic ---
     updatePanePreview(paneEl, note) {
         const previewContentEl = paneEl.querySelector('.preview-content');
         if (!previewContentEl) return;
@@ -529,10 +562,7 @@ class PKMApp {
         let content = note.getContentWithoutMetadata();
 
         content = content.replace(/!\[\[([^#\]]+)#\^([^\]]+)\]\]/g, (match, noteTitle, blockId) => {
-            const targetNote = Object.values(this.notes).find(n => 
-                n.title.toLowerCase() === noteTitle.trim().toLowerCase()
-            );
-            
+            const targetNote = Object.values(this.notes).find(n => n.title.toLowerCase() === noteTitle.trim().toLowerCase());
             if (targetNote) {
                 const blockContent = targetNote.getBlockContent(blockId.trim());
                 if (blockContent) {
@@ -548,12 +578,16 @@ class PKMApp {
 
         let codeBlockIndex = 0;
 
+        const notesMap = Object.values(this.notes).reduce((acc, note) => {
+            acc[note.title.toLowerCase()] = true;
+            return acc;
+        }, {});
+
         const finalHtmlParts = parts.map((part) => {
             if (part.startsWith('```python')) {
                 const code = part.replace(/^```python\n/, '').replace(/\n```$/, '');
                 const uniqueId = `code-${note.id}-${codeBlockIndex}`;
                 const escapedCode = this.escapeHtml(code);
-
                 const noteOutputs = this.codeBlockOutputs.get(note.id) || new Map();
                 const storedOutput = noteOutputs.get(codeBlockIndex) || '';
                 
@@ -568,14 +602,8 @@ class PKMApp {
                 codeBlockIndex++;
                 return html;
             } else {
-                let markdownPart = part.replace(/\[\[([^\]]+)\]\]/g, (match, linkText) => {
-                    const exists = Object.values(this.notes).some(n => 
-                        n.title.toLowerCase() === linkText.toLowerCase()
-                    );
-                    return `<span class="${exists ? 'wikilink' : 'wikilink broken'}" data-link="${linkText}">${linkText}</span>`;
-                });
-                
-                return marked.parse(markdownPart);
+                // The custom marked extension now handles wikilinks correctly.
+                return marked.parse(part, { notesMap });
             }
         });
 
@@ -644,7 +672,6 @@ class PKMApp {
             }
         }
     }
-
     bindPreviewEvents(paneEl, note) {
         let codeBlockIndex = 0;
         paneEl.querySelectorAll('.run-btn').forEach(button => {
@@ -751,7 +778,7 @@ class PKMApp {
                 if (targetNote) {
                     this.openNote(targetNote.id);
                 } else {
-                    console.warn(`Target note "${linkText}" not found`);
+                    this.createNoteWithTitle(linkText);
                 }
             });
         });
