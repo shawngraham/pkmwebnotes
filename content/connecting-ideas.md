@@ -1,5 +1,5 @@
 ---
-title: connecting-ideas
+title: Connecting Ideas
 created: 2025-08-05T15:32:04.661Z
 tags: ["getting started"]
 ---
