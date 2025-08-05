@@ -1,4 +1,5 @@
 :root {
+    /* Main Theme Colors */
     --primary: #2563eb;
     --background: #ffffff;
     --surface: #f8fafc;
@@ -8,6 +9,14 @@
     --success: #059669;
     --warning: #d97706;
     --error: #ef4444;
+
+    /* --- ADDED: Missing Variables for Modals and Buttons --- */
+    --primary-hover: #1d4ed8;
+    --bg-primary: var(--background);
+    --bg-secondary: var(--surface);
+    --bg-hover: #f1f5f9;
+    --text-primary: var(--text);
+    --border-light: var(--border);
 }
 
 [data-theme="dark"] {
@@ -18,8 +27,17 @@
     --text-muted: #94a3b8;
     --border: #334155;
     --error: #f87171;
+    
+    /* --- ADDED: Dark Theme Variables for Modals --- */
+    --primary-hover: #60a5fa;
+    --bg-primary: var(--surface);
+    --bg-secondary: var(--background);
+    --bg-hover: #334155;
+    --text-primary: var(--text);
+    --border-light: #2c3a4f;
 }
 
+/* --- (The rest of your CSS file from * down to the line before .confirm-overlay is correct) --- */
 * { 
     margin: 0; 
     padding: 0; 
@@ -1681,4 +1699,103 @@ body {
     .pyodide-status {
         padding: 6px;
     }
+}
+
+/* --- Confirmation Modal Styles --- */
+
+.confirm-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 9998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.confirm-modal {
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    width: 90%;
+    max-width: 400px;
+    z-index: 9999;
+    overflow: hidden;
+}
+
+.confirm-modal-header {
+    padding: 16px;
+    font-size: 1.1em;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.confirm-modal-body {
+    padding: 20px 16px;
+    line-height: 1.5;
+}
+
+.confirm-modal-footer {
+    padding: 12px 16px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    background-color: var(--bg-secondary);
+    border-top: 1px solid var(--border-light);
+}
+
+.confirm-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+/* --- FIX: Use --primary instead of --primary-color --- */
+.confirm-btn.primary {
+    background-color: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+.confirm-btn.primary:hover {
+    background-color: var(--primary-hover);
+}
+
+.confirm-btn.danger {
+    background-color: #d9534f;
+    color: white;
+    border-color: #d9534f;
+}
+.confirm-btn.danger:hover {
+    background-color: #c9302c;
+}
+
+/* --- FIX: Use --text-primary --- */
+.confirm-btn.secondary {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+}
+.confirm-btn.secondary:hover {
+    background-color: var(--bg-hover);
+}
+
+/* --- FIX: Added styles for the checkbox --- */
+.confirm-modal-skip {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-light);
+    font-size: 0.9em;
+    color: var(--text-muted);
+}
+.confirm-modal-skip label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
 }

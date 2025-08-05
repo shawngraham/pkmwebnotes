@@ -10,7 +10,7 @@ import { storage, debounce } from './utils.js';
 class PKMApp {
     constructor() {
         this.notes = this.loadNotes();
-        this.settings = storage.get('pkm_settings', { theme: 'light' });
+        this.settings = storage.get('pkm_settings', { theme: 'light', skipDeleteConfirm: false });
 
         this.panes = storage.get('pkm_panes', []);
         this.focusedPaneId = storage.get('pkm_focused_pane', null);
@@ -28,6 +28,8 @@ class PKMApp {
 
         this.init();
     }
+    
+    // --- (Methods from constructor down to createNote are unchanged) ---
     
     bindPyodideStatus() {
         this.pyodideManager.setStatusCallback((status, message) => {
@@ -272,20 +274,129 @@ class PKMApp {
         this.openNoteInNewPane(note.id);
     }
 
-    deleteNote(noteId) {
-        if (!confirm(`Are you sure you want to permanently delete "${this.notes[noteId]?.title || 'this note'}"?`)) return;
+    // --- MODIFIED: deleteNote now uses the custom modal ---
+        async deleteNote(noteId, event = {}) {
+        // --- NEW: Check if we should skip the modal ---
+        // We show the modal if the setting is OFF, OR if the user holds Shift.
+        let confirmed = true; // Assume confirmation if skipping
+        let skipFuture = false;
+
+        if (!this.settings.skipDeleteConfirm || event.shiftKey) {
+            const title = this.notes[noteId]?.title || 'this note';
+            const result = await this._showConfirmationModal({
+                title: 'Delete Note?',
+                message: `Are you sure you want to permanently delete "${title}"? This action cannot be undone. <br><br><b>Tip:</b> Hold 'Shift' when clicking 'Delete' to always see this confirmation.`,
+                confirmText: 'Delete',
+                confirmClass: 'danger',
+                showSkipCheckbox: true // Enable our new checkbox
+            });
+
+            confirmed = result.confirmed;
+            skipFuture = result.skipFuture;
+        }
+
+        // Exit if the user cancelled the modal
+        if (!confirmed) return;
+
+        // If the user checked the "skip" box, update and save the settings
+        if (skipFuture) {
+            this.settings.skipDeleteConfirm = true;
+            this.saveSettings();
+        }
+
+        // --- The rest of the deletion logic is the same ---
+        const focusedPane = this.getPane(this.focusedPaneId);
+        if (focusedPane && focusedPane.noteId === noteId) {
+            this.focusedPaneId = null;
+        }
+
         this.panes = this.panes.filter(p => p.noteId !== noteId);
-        if (this.panes.some(p => p.id === this.focusedPaneId && p.noteId === noteId)) this.focusedPaneId = null;
+
+        if (!this.focusedPaneId && this.panes.length > 0) {
+            this.focusedPaneId = this.panes[this.panes.length - 1].id;
+        }
+
         delete this.notes[noteId];
         this.backlinksManager.updateNotes(this.notes);
         this.graphManager.updateNotes(this.notes);
+        
         this.saveNotes();
         this.savePanes();
+        
         this.renderNoteList();
         this.renderAllPanes();
         this.updateRightSidebar();
     }
 
+    // --- Custom Promise-based Confirmation Modal ---
+    _showConfirmationModal(options) {
+        return new Promise((resolve) => {
+            const { 
+                title = 'Confirm', 
+                message = 'Are you sure?', 
+                confirmText = 'OK', 
+                cancelText = 'Cancel',
+                confirmClass = 'primary',
+                showSkipCheckbox = false
+            } = options;
+
+            const overlay = document.createElement('div');
+            overlay.className = 'confirm-overlay';
+
+                        let skipCheckboxHTML = '';
+            if (showSkipCheckbox) {
+                skipCheckboxHTML = `
+                    <div class="confirm-modal-skip">
+                        <label>
+                            <input type="checkbox" id="confirmSkipCheckbox"> I understand, do not ask again.
+                        </label>
+                    </div>
+                `;
+            }
+            
+            overlay.innerHTML = `
+                <div class="confirm-modal">
+                    <div class="confirm-modal-header">${title}</div>
+                    <div class="confirm-modal-body">${message} \n ${skipCheckboxHTML} </div>
+                    <div class="confirm-modal-footer">
+                        <button class="confirm-btn secondary" id="confirmCancelBtn">${cancelText}</button>
+                        <button class="confirm-btn ${confirmClass}" id="confirmOkBtn">${confirmText}</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(overlay);
+
+            const okBtn = document.getElementById('confirmOkBtn');
+            const cancelBtn = document.getElementById('confirmCancelBtn');
+            const skipCheckbox = document.getElementById('confirmSkipCheckbox');
+
+            const cleanup = () => {
+                okBtn.removeEventListener('click', onOk);
+                cancelBtn.removeEventListener('click', onCancel);
+                overlay.remove();
+            };
+
+            const onOk = () => {
+                cleanup();
+                resolve({
+                    confirmed: true,
+                    skipFuture: skipCheckbox ? skipCheckbox.checked : false
+                });
+            };
+
+            const onCancel = () => {
+                cleanup();
+                resolve({ confirmed: false, skipFuture: false });
+            };
+
+            okBtn.addEventListener('click', onOk);
+            cancelBtn.addEventListener('click', onCancel);
+        });
+    }
+
+    // --- (The rest of the file from renderAllPanes onwards is unchanged) ---
+    
     renderAllPanes() {
         const container = document.getElementById('editorPanesContainer');
         if (this.panes.length === 0) {
@@ -477,7 +588,6 @@ class PKMApp {
         this.bindPreviewEvents(paneEl, note);
     }
     
-    // --- CORRECTLY PLACED HELPER METHODS ---
     base64ToBlob(base64, contentType = 'image/png', sliceSize = 512) {
         const byteCharacters = atob(base64);
         const byteArrays = [];
@@ -596,7 +706,6 @@ class PKMApp {
                             }
                         }
 
-                        // --- MODIFIED: Reliable Download Logic ---
                         if (target.matches('.download-plot-btn')) {
                             const base64 = target.dataset.plotBase64;
                             const filename = target.dataset.filename;
@@ -896,8 +1005,8 @@ class PKMApp {
         });
         
         if (noteId) {
-            menu.querySelector('[data-action="delete"]').addEventListener('click', () => { 
-                this.deleteNote(noteId); 
+            menu.querySelector('[data-action="delete"]').addEventListener('click', (e) => {  
+                this.deleteNote(noteId, e); 
                 this.hideContextMenu(); 
             });
             
