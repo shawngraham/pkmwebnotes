@@ -7,6 +7,7 @@
     --border: #e2e8f0;
     --success: #059669;
     --warning: #d97706;
+    --error: #ef4444;
 }
 
 [data-theme="dark"] {
@@ -16,6 +17,7 @@
     --text: #f1f5f9;
     --text-muted: #94a3b8;
     --border: #334155;
+    --error: #f87171;
 }
 
 * { 
@@ -86,6 +88,92 @@ body {
 .header-actions {
     display: flex;
     gap: 8px;
+    align-items: center;
+}
+
+/* Pyodide Status Indicator */
+.pyodide-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+    transition: all 0.3s ease;
+}
+
+.pyodide-status .status-icon {
+    font-size: 16px;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.pyodide-status .status-text {
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.pyodide-status.loading {
+    border-color: var(--warning);
+    background: rgba(217, 119, 6, 0.1);
+}
+
+.pyodide-status.loading .status-text {
+    color: var(--warning);
+}
+
+.pyodide-status.ready {
+    border-color: var(--success);
+    background: rgba(5, 150, 105, 0.1);
+}
+
+.pyodide-status.ready .status-text {
+    color: var(--success);
+}
+
+.pyodide-status.ready .status-icon {
+    animation: none;
+}
+
+.pyodide-status.error {
+    border-color: var(--error);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.pyodide-status.error .status-text {
+    color: var(--error);
+}
+
+.pyodide-status.error .status-icon {
+    animation: shake 0.5s ease-in-out;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.7; }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+[data-theme="dark"] .pyodide-status {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .pyodide-status.loading {
+    background: rgba(217, 119, 6, 0.2);
+}
+
+[data-theme="dark"] .pyodide-status.ready {
+    background: rgba(5, 150, 105, 0.2);
+}
+
+[data-theme="dark"] .pyodide-status.error {
+    background: rgba(239, 68, 68, 0.2);
 }
 
 .btn {
@@ -191,7 +279,7 @@ body {
     right: 0;
     bottom: 0;
     display: flex;
-    overflow-x: auto; /* Keep horizontal scroll for when total width exceeds container */
+    overflow-x: auto;
     overflow-y: hidden;
     height: 100%;
 }
@@ -484,9 +572,9 @@ body {
 
 /* Animation for maximize button icon */
 .maximize-btn::before {
-    font-family: "Font Awesome 5 Free"; /* Or your specific version */
+    font-family: "Font Awesome 5 Free";
     content: "\f065";
-    font-weight: 900; /* Required for solid icons */
+    font-weight: 900;
     display: inline-block;
     position: absolute;
     top: 50%;
@@ -500,7 +588,7 @@ body {
 }
 
 .maximize-btn.minimized::before {
-    content: '\2922'; /* Unicode for a minimize symbol */
+    content: '\2922';
 }
 
 .maximize-btn:active::before {
@@ -1303,13 +1391,14 @@ body {
     background: rgba(0, 0, 0, 0.7);
 }
 
-/* Code Execution Styles */
+/* Enhanced Code Execution Styles */
 .code-container {
     border: 1px solid var(--border);
     border-radius: 6px;
     margin-bottom: 16px;
     background: var(--surface);
     overflow: hidden;
+    position: relative;
 }
 
 .code-header {
@@ -1326,6 +1415,16 @@ body {
     font-size: 12px;
     color: var(--text-muted);
     text-transform: uppercase;
+}
+
+.execution-counter {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 400;
 }
 
 .run-btn {
@@ -1367,30 +1466,97 @@ body {
     min-height: 1.5em;
 }
 
+.code-output.has-output {
+    border-top: 1px solid var(--border);
+}
+
 .code-output pre {
     white-space: pre-wrap;
     word-break: break-all;
     margin: 0;
+    background: none;
+    padding: 0;
 }
 
 .code-output .output-text {
     color: var(--text);
+    margin-bottom: 8px;
 }
 
 .code-output .output-result {
     color: var(--success);
     margin-top: 8px;
-    border-top: 1px solid var(--border);
     padding-top: 8px;
+    border-top: 1px dashed var(--border);
 }
 
 .code-output .output-error {
-    color: #ef4444;
+    color: var(--error);
+    background: rgba(239, 68, 68, 0.1);
+    padding: 8px;
+    border-radius: 4px;
 }
 
 .code-output .spinner {
     color: var(--text-muted);
     font-style: italic;
+}
+
+/* Output type labels */
+.output-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    font-weight: 500;
+}
+
+/* DataFrame table styling */
+.code-output table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 8px;
+    font-size: 12px;
+}
+
+.code-output table th,
+.code-output table td {
+    border: 1px solid var(--border);
+    padding: 4px 8px;
+    text-align: left;
+}
+
+.code-output table th {
+    background: var(--surface);
+    font-weight: 600;
+}
+
+.code-output table tr:nth-child(even) {
+    background: var(--surface);
+}
+
+/* Plot output styling */
+.code-output img {
+    max-width: 100%;
+    height: auto;
+    margin-top: 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+}
+
+/* Execution number styling */
+.execution-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.execution-number {
+    font-weight: 500;
+    color: var(--primary);
 }
 
 /* High contrast mode support */
@@ -1402,6 +1568,10 @@ body {
     .editor-container.maximized {
         border-width: 3px !important;
     }
+    
+    .pyodide-status {
+        border-width: 2px;
+    }
 }
 
 /* Reduced motion support */
@@ -1409,7 +1579,8 @@ body {
     .editor-container,
     .maximize-btn,
     .maximize-btn::before,
-    .editor-container.maximized::before {
+    .editor-container.maximized::before,
+    .pyodide-status .status-icon {
         transition: none !important;
         animation: none !important;
     }
@@ -1417,7 +1588,8 @@ body {
 
 /* Print styles - hide maximize buttons */
 @media print {
-    .maximize-btn {
+    .maximize-btn,
+    .pyodide-status {
         display: none !important;
     }
 }
@@ -1500,5 +1672,13 @@ body {
     
     .welcome-checkbox {
         justify-content: center;
+    }
+    
+    .pyodide-status .status-text {
+        display: none;
+    }
+    
+    .pyodide-status {
+        padding: 6px;
     }
 }

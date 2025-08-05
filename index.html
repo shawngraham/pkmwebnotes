@@ -5,16 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PKM Notes</title>
     <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
 </head>
 <body>
     <div class="app">
         <header class="header">
             <div class="logo">📝 PKM WebNotes</div>
-
             <input type="text" class="search-input" placeholder="Search notes..." id="searchInput">
             <div class="header-actions">
+                <!-- Pyodide Status Indicator -->
+                <div class="pyodide-status" id="pyodideStatus" title="Python environment status">
+                    <span class="status-icon">🐍</span>
+                    <span class="status-text">Loading...</span>
+                </div>
                 <button class="btn" id="themeBtn">🌓</button>
                 <button class="btn" id="importBtn">Import</button>
                 <button class="btn" id="exportBtn">Export</button>
@@ -24,37 +27,29 @@
         </header>
 
         <main class="main">
-    <aside class="sidebar">
-        <div class="sidebar-header">All Notes</div>
-        <div class="note-list" id="noteList"></div>
-    </aside>
+            <aside class="sidebar">
+                <div class="sidebar-header">All Notes</div>
+                <div class="note-list" id="noteList"></div>
+            </aside>
 
-    <!--
-      Correct Structure:
-      1. A wrapper div that is the grid item.
-    -->
-    <div class="editor-area">
-      <!--
-        2. Inside it, the ONE container that will scroll.
-           app.js will add/remove notes from here.
-      -->
-      <div class="editor-panes-container" id="editorPanesContainer">
-        <div class="empty-state">
-          <h3>Welcome to PKM Notes</h3>
-          <p>Select a note from the sidebar or create a new one to get started.</p>
-        </div>
-      </div>
-    </div>
-
-    <aside class="right-sidebar" id="rightSidebar">
-        <div class="right-sidebar-content">
-             <div class="empty-sidebar">
-                <p>No note selected.</p>
+            <div class="editor-area">
+                <div class="editor-panes-container" id="editorPanesContainer">
+                    <div class="empty-state">
+                        <h3>Welcome to PKM Notes</h3>
+                        <p>Select a note from the sidebar or create a new one to get started.</p>
+                    </div>
+                </div>
             </div>
-        </div>
-    </aside>
-</main>
-<div class="width-tooltip" id="widthTooltip"></div>
+
+            <aside class="right-sidebar" id="rightSidebar">
+                <div class="right-sidebar-content">
+                    <div class="empty-sidebar">
+                        <p>No note selected.</p>
+                    </div>
+                </div>
+            </aside>
+        </main>
+        <div class="width-tooltip" id="widthTooltip"></div>
     </div>
 
     <input type="file" id="fileInput" multiple accept=".md,.txt" class="hidden">
@@ -62,8 +57,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
-  
+    
     <script type="module" src="app.js"></script>
-
 </body>
 </html>

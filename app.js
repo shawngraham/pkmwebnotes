@@ -15,17 +15,41 @@ class PKMApp {
         this.panes = storage.get('pkm_panes', []);
         this.focusedPaneId = storage.get('pkm_focused_pane', null);
         
+        // Check for first-time load and create default notes if needed
+        if (Object.keys(this.notes).length === 0) {
+            const hasLoadedBefore = storage.get('pkm_has_loaded_before', false);
+            if (!hasLoadedBefore) {
+                console.log("First time load: creating default notes.");
+                this.notes = this.createDefaultNotes();
+                this.saveNotes();
+                storage.set('pkm_has_loaded_before', true);
+            }
+        }
+
+
+
         this.paneWidths = new Map(storage.get('pkm_pane_widths', []));
 
         this.backlinksManager = new BacklinksManager(this.notes);
         this.graphManager = new GraphManager(this.notes);
         
-        // FIXED: Use new PyodideManager instead of old approach
         this.pyodideManager = new PyodideManager();
-
+        this.codeBlockOutputs = new Map();
+        
         this.graphManager.onNodeClick = (noteId) => this.openNote(noteId);
         this.resizablePanes = null;
         this.init();
+    }
+    
+    bindPyodideStatus() {
+        this.pyodideManager.setStatusCallback((status, message) => {
+            const statusEl = document.getElementById('pyodideStatus');
+            const textEl = statusEl.querySelector('.status-text');
+            if (!statusEl || !textEl) return;
+            statusEl.className = 'pyodide-status'; // Reset classes
+            statusEl.classList.add(status);
+            textEl.textContent = message;
+        });
     }
 
     loadNotes() {
@@ -44,6 +68,7 @@ class PKMApp {
 
     init() {
         this.setupTheme();
+        this.bindPyodideStatus();
         this.bindGlobalEvents();
         this.renderNoteList();
         this.loadInitialPanes();
@@ -63,6 +88,157 @@ class PKMApp {
                 this.showContextMenu(e, null);
             }
         });
+    }
+
+     createDefaultNotes() {
+        const notes = {};
+
+        const welcomeNoteContent = `---
+title: Welcome to PKM WebNotes
+created: ${new Date().toISOString()}
+tags: [welcome, getting-started]
+---
+
+# 👋 Welcome to PKM WebNotes
+
+This is your personal knowledge management system in the browser.
+
+## Key Features
+
+- **Markdown Editor**: Write notes using simple markdown syntax.
+- **Wikilinks**: Connect your ideas by creating links between notes with [[Note Title]].
+- **Backlinks**: See which notes link to your current note in the right sidebar.
+- **Graph View**: Visualize the connections between your notes.
+- **Python Execution**: Run Python code directly within your notes! See the [[Python in Notes]] note for details.
+
+## Getting Started
+
+1.  **Create a new note**: Click the "+ New Note" button.
+2.  **Start writing**: Use the editor in the central pane.
+3.  **Create a link**: Type [[ and start typing a note title. An autocomplete will appear. Try linking to [[Python in Notes]].`;
+
+        const pythonNoteContent = `---
+title: Python in Notes
+created: ${new Date().toISOString()}
+tags: [python, code, tutorial]
+---
+
+# 🐍 Executing Python in Your Notes
+
+You can run Python code blocks directly in your notes. This is powered by [Pyodide](https://pyodide.org/), which brings a full Python environment to your browser. The status of the Python environment is shown in the header.
+
+## Basic Example
+
+Here's a simple Python code block. Click the "▶ Run" button in the preview pane to execute it. The output will be numbered.
+
+\`\`\`python
+import sys
+print(f"Hello from Python {sys.version}!")
+
+# The last expression in a cell is automatically displayed as the result
+a = 10
+b = 20
+a + b
+\`\`\`
+
+## Data Analysis with Pandas
+
+The environment comes with \`pandas\` and \`numpy\` pre-installed. You can perform data analysis right here.
+
+\`\`\`python
+import pandas as pd
+from io import StringIO
+
+# Create a sample dataset
+csv_data = """
+fruit,quantity,color
+apple,12,red
+banana,18,yellow
+grape,30,purple
+"""
+
+# Read it into a DataFrame
+df = pd.read_csv(StringIO(csv_data))
+
+# Display the DataFrame
+df
+\`\`\`
+
+## Creating Plots
+
+You can also generate plots using \`matplotlib\`. Any plots created will be displayed as images below the code cell.
+
+\`\`\`python
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Generate some data
+x = np.linspace(0, 10, 100)
+y = np.sin(x)
+
+# Create a plot
+fig, ax = plt.subplots()
+ax.plot(x, y)
+ax.set_title("A Simple Sine Wave")
+ax.set_xlabel("x")
+ax.set_ylabel("sin(x)")
+
+# The plot will be captured and displayed automatically
+plt.show()
+\`\`\`
+
+## Loading External Data
+
+You can load data from URLs using the special \`#data_url:\` directive:
+
+\`\`\`python
+#data_url: https://raw.githubusercontent.com/mwaskom/seaborn-data/master/tips.csv
+import pandas as pd
+from io import StringIO
+
+# The fetched data is available in the 'fetched_data' variable
+df = pd.read_csv(StringIO(fetched_data))
+print(f"Loaded {len(df)} rows of data")
+print("\nFirst 5 rows:")
+df.head()
+\`\`\`
+
+## Important Notes
+
+- Each note maintains its own Python environment
+- Variables persist between code cells in the same note
+- The execution counter [n] shows the order of execution
+- First execution may take a few seconds while Pyodide loads
+- Check the Python status indicator in the header (🐍)
+
+## Available Libraries
+
+The following libraries are pre-installed:
+- pandas
+- numpy  
+- matplotlib
+- json
+- csv
+- micropip (for installing additional packages)
+
+You can install with micropip like this:
+
+\'\'\'
+await micropip.install("networkx")
+\'\'\'
+
+Happy coding! 🐍
+
+
+`;
+
+        const welcomeNote = new Note("Welcome to PKM WebNotes", welcomeNoteContent);
+        const pythonNote = new Note("Python in Notes", pythonNoteContent);
+        
+        notes[welcomeNote.id] = welcomeNote;
+        notes[pythonNote.id] = pythonNote;
+
+        return notes;
     }
 
     initResizablePanes() {
@@ -359,7 +535,6 @@ class PKMApp {
         this.updatePanePreview(paneEl, note);
     }
 
-    // FIXED updatePanePreview method
     updatePanePreview(paneEl, note) {
         const previewContentEl = paneEl.querySelector('.preview-content');
         if (!previewContentEl) return;
@@ -385,21 +560,28 @@ class PKMApp {
         // Split content by Python code blocks
         const codeBlockRegex = /(```python\n[\s\S]*?\n```)/g;
         const parts = content.split(codeBlockRegex);
-        
-        const finalHtmlParts = parts.map((part, index) => {
-            if (part.match(/^```python\n[\s\S]*\n```$/)) {
+
+        let codeBlockIndex = 0; // <-- Add a counter for code blocks
+
+        const finalHtmlParts = parts.map((part) => {
+            if (part.startsWith('```python')) {
                 const code = part.replace(/^```python\n/, '').replace(/\n```$/, '');
-                const uniqueId = `code-${note.id}-${index}-${Date.now()}`;
+                const uniqueId = `code-${note.id}-${codeBlockIndex}`;
                 const escapedCode = this.escapeHtml(code);
+
+                const noteOutputs = this.codeBlockOutputs.get(note.id) || new Map();
+                const storedOutput = noteOutputs.get(codeBlockIndex) || '';
                 
-                return `<div class="code-container" id="${uniqueId}">
-                            <div class="code-header">
-                                <span>PYTHON</span>
-                                <button class="run-btn">▶ Run</button>
-                            </div>
-                            <pre><code class="language-python">${escapedCode}</code></pre>
-                            <div class="code-output"></div>
-                        </div>`;
+                const html = `<div class="code-container" id="${uniqueId}">
+                        <div class="code-header">
+                            <span>PYTHON</span>
+                            <button class="run-btn">▶ Run</button>
+                        </div>
+                        <pre><code class="language-python">${escapedCode}</code></pre>
+                        <div class="code-output">${storedOutput}</div>
+                    </div>`;
+                codeBlockIndex++;
+                return html;
             } else {
                 let markdownPart = part.replace(/\[\[([^\]]+)\]\]/g, (match, linkText) => {
                     const exists = Object.values(this.notes).some(n => 
@@ -423,10 +605,11 @@ class PKMApp {
         this.bindPreviewEvents(paneEl, note);
     }
 
-    // FIXED bindPreviewEvents method
     bindPreviewEvents(paneEl, note) {
         // Bind code execution buttons
+        let codeBlockIndex = 0;
         paneEl.querySelectorAll('.run-btn').forEach(button => {
+            const currentBlockIndex = codeBlockIndex++; // Capture the index for this button
             // Remove existing listeners to prevent duplicates
             const newButton = button.cloneNode(true);
             button.parentNode.replaceChild(newButton, button);
@@ -449,12 +632,17 @@ class PKMApp {
                 newButton.textContent = '⏳ Running...';
 
                 try {
-                    // Execute the code using the new PyodideManager
-                    const { result, stdout } = await this.pyodideManager.executeCode(code, note.id);
+                    // Execute the code using PyodideManager, passing the block index
+                    const execResult = await this.pyodideManager.executeCode(code, note.id, currentBlockIndex);
                     
                     // Format and display output
-                    const outputHtml = this.pyodideManager.formatOutput(result, stdout);
+                    const outputHtml = this.pyodideManager.formatOutput(execResult.result, execResult.stdout, execResult.executionNumber, execResult.plots);
                     outputEl.innerHTML = outputHtml;
+
+                    // Store the output
+                    const noteOutputs = this.codeBlockOutputs.get(note.id) || new Map();
+                    noteOutputs.set(currentBlockIndex, outputHtml);
+                    this.codeBlockOutputs.set(note.id, noteOutputs);                    
                     
                 } catch (error) {
                     console.error('Python execution error:', error);
@@ -471,6 +659,9 @@ class PKMApp {
                     }
                     
                     outputEl.innerHTML = `<pre class="output-error">${this.escapeHtml(errorMessage)}</pre>`;
+                    const noteOutputs = this.codeBlockOutputs.get(note.id) || new Map();
+                    noteOutputs.set(currentBlockIndex, outputEl.innerHTML);
+                    this.codeBlockOutputs.set(note.id, noteOutputs);
                     
                 } finally {
                     newButton.disabled = false;
@@ -620,7 +811,7 @@ class PKMApp {
         if (!networkData) return;
 
         const note = this.notes[noteId];
-        const timestamp = new Date().toISOString().split('T')[0];
+        const timestamp = new Date().toISOString().split('T');
         const safeTitle = note.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
         const networkType = completeNetwork ? 'complete' : `ego_${currentSteps}step${currentSteps > 1 ? 's' : ''}`;
 
@@ -789,7 +980,7 @@ class PKMApp {
     
     if (linkMatch) {
         // Show the autocomplete menu and provide a callback that includes the original match
-        autocompleteManager.show(textarea, linkMatch[1], (selectedMatch) => {
+        autocompleteManager.show(textarea, linkMatch, (selectedMatch) => {
             // Pass BOTH the user's selection and the original regex match
             onSelectCallback(selectedMatch, linkMatch);
         });
@@ -803,8 +994,8 @@ class PKMApp {
     const cursorPos = textarea.selectionStart;
     
     // Use the originalLinkMatch to determine what text to replace.
-    // originalLinkMatch[0] is the full matched string (e.g., "[[My Li")
-    const queryToReplace = originalLinkMatch[0];
+    // originalLinkMatch is the full matched string (e.g., "[[My Li")
+    const queryToReplace = originalLinkMatch;
     const startOfReplace = cursorPos - queryToReplace.length;
     
     const textBefore = textarea.value.substring(0, startOfReplace);
@@ -895,10 +1086,10 @@ class PKMApp {
                     let title = file.name.replace(/\.(md|txt)$/i, '');
                     const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
                     if (yamlMatch) {
-                        const yamlContent = yamlMatch[1];
+                        const yamlContent = yamlMatch;
                         const titleMatch = yamlContent.match(/^title:\s*(.+)$/m);
                         if (titleMatch) {
-                            title = titleMatch[1].replace(/^['"]|['"]$/g, '');
+                            title = titleMatch.replace(/^['"]|['"]$/g, '');
                         }
                     }
                     const note = new Note(title, content);
