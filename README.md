@@ -9,6 +9,27 @@ Try the version at [https://pkm-webnotes.netlify.app/](https://pkm-webnotes.netl
 
 This is a **toy** that I intend to use with students to introduce ideas of personal knowledge management before introducing them to something more substantial.
 
+## Deploy with your own default content
+
+
++ Fork the repo at https://github.com/shawngraham/pkmwebnotes
++ Add more content as .md files in the content subfolder
++ Add the filenames to the content/manifest.json file, eg:
+
+```
+{
+  "defaultNotes": [
+    "welcome.md",
+    "python-in-notes.md",
+    "custom-deploy.md"
+  ]
+}
+```
+
++ Use GH-Pages or Netlify Drop or another webhosting service to push it online (no builds, no Jekyll, etc etc!)
+
+
+
 ## Features
 
 ### Note Management
@@ -31,18 +52,6 @@ This is a **toy** that I intend to use with students to introduce ideas of perso
 - Click any pane to focus it
 - Close individual panes with the X button
 - Right sidebar shows information for the currently focused note
-- Maximize the focussed pane to occupy the whole editor space
-
-### Python Code Execution
-- Write Python code in markdown blocks (<code>\`\`\`python</code>) and execute it directly in your notes.
-- Standard output (from <code>print()</code>) and the final result are displayed below the code.
-- Load external data (e.g., a CSV file) by adding a special directive to the top of a code block: <code>#data_url: *your_url_here*</code>. The raw text content from the URL will be automatically loaded into a variable named <code>fetched_data</code> for you to use in your script, eg <code>df = pd.read_csv(StringIO(fetched_data))</code>.</li>
-- NB:</b> The first time you run Python code, it may take a few seconds to initialize the environment, during which the app might seem frozen.
-- Install packages with micropip:
-```
-await micropip.install('seaborn')
-import seaborn as sns
-```
 
 ### Import and Export
 - Import markdown (.md) and text (.txt) files
@@ -59,6 +68,12 @@ import seaborn as sns
     - High betweenness centrality notes = Your most important conceptual bridges
     - Communities = Natural topic clusters in your knowledge
     - Modularity score = How well-separated your topics are
+
+### Python kernel and code execution
+
+- Pyodide installed
+- fenced python codeblocks can be executed within a note
+- each note has its own state
 
 ### Themes
 - Light and dark theme support
@@ -169,6 +184,9 @@ All data is stored locally in your browser using localStorage. This means:
 - No cloud synchronization
 - Limited to browser storage capacity
 - No mobile-optimized interface
+
+## NB Note Names
+Change the name by changing the `title:` yaml field. Refresh the display to update the sidebar (ctrl+r). This is still a bit glitchy.
 
 ## Development
 
