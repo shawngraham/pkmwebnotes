@@ -15,17 +15,7 @@ This is a **toy** that I intend to use with students to introduce ideas of perso
 + Fork the repo at https://github.com/shawngraham/pkmwebnotes
 + Add more content as .md files in the content subfolder
 + Add the filenames to the content/manifest.json file, eg:
-
-```
-{
-  "defaultNotes": [
-    "welcome.md",
-    "python-in-notes.md",
-    "custom-deploy.md"
-  ]
-}
-```
-
++ subfolders work, see example manifest.json for the pattern
 + Use GH-Pages or Netlify Drop or another webhosting service to push it online (no builds, no Jekyll, etc etc!)
 
 
