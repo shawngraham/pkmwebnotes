@@ -30,7 +30,7 @@ class PKMApp {
         this.init();
     }
     
-    // --- CORRECTED: Fixed the tokenizer bug ---
+    
     setupMarked() {
         const wikilinkExtension = {
             name: 'wikilink',
@@ -42,8 +42,8 @@ class PKMApp {
                 if (match) {
                     return {
                         type: 'wikilink',
-                        raw: match[0],         // FIX: Was `match`
-                        text: match[1].trim(), // FIX: Was `match.trim()`
+                        raw: match[0],         
+                        text: match[1].trim(), 
                     };
                 }
             },
@@ -119,47 +119,141 @@ class PKMApp {
         });
     }
 
-    async createDefaultNotes() {
-        const notes = {};
-        try {
-            const manifestResponse = await fetch('content/manifest.json');
-            if (!manifestResponse.ok) {
-                throw new Error(`Failed to fetch manifest.json: ${manifestResponse.statusText}`);
-            }
-            const manifest = await manifestResponse.json();
-            const noteFiles = manifest.defaultNotes;
-
-            if (!noteFiles || noteFiles.length === 0) {
-                console.warn("No default notes listed in manifest.json");
-                return {};
-            }
-
-            const fetchPromises = noteFiles.map(filename => 
-                fetch(`content/${filename}`)
-                    .then(response => {
-                        if (!response.ok) {
-                            console.error(`Failed to fetch ${filename}: ${response.statusText}`);
-                            return `# Error\n\nFailed to load content for ${filename}.`;
-                        }
-                        return response.text();
-                    })
-            );
-
-            const noteContents = await Promise.all(fetchPromises);
-
-            noteContents.forEach((content) => {
-                const note = new Note("Default Note", content);
-                note.update(content, true); 
-                notes[note.id] = note;
-            });
-
-        } catch (error) {
-            console.error("Error creating default notes:", error);
-            const errorNote = new Note("Error Loading Notes", "There was an issue loading the default notes. Please check 'content/manifest.json' and the browser console for details.");
-            notes[errorNote.id] = errorNote;
+    
+async createDefaultNotes() {
+    const notes = {};
+    try {
+        console.log("=== Starting createDefaultNotes ===");
+        
+        const manifestResponse = await fetch('content/manifest.json');
+        if (!manifestResponse.ok) {
+            throw new Error(`Failed to fetch manifest.json: ${manifestResponse.statusText}`);
         }
-        return notes;
+        
+        const manifest = await manifestResponse.json();
+        console.log("Manifest loaded:", manifest);
+
+        
+        const processEntries = (entries, currentPath = '') => {
+            let files = [];
+            console.log(`Processing entries at path: "${currentPath}"`);
+            
+            for (const key in entries) {
+                const value = entries[key];
+                console.log(`Processing key: "${key}", value type:`, Array.isArray(value) ? 'array' : typeof value);
+                
+                if (Array.isArray(value)) { 
+                    // It's a list of files
+                    console.log(`"${key}" is an array with ${value.length} files`);
+                    
+                    value.forEach(filename => {
+                        let filePath, folder;
+                        
+                        if (key === 'root') {
+                            // Root files go directly in content/
+                            filePath = filename;
+                            folder = 'root';
+                        } else {
+                            // Other arrays are folder names
+                            // Build the full path including any parent path
+                            filePath = currentPath ? `${currentPath}${key}/${filename}` : `${key}/${filename}`;
+                            folder = currentPath ? `${currentPath}${key}` : key;
+                        }
+                        
+                        const fileInfo = { filePath, folder };
+                        console.log(`Added file: ${JSON.stringify(fileInfo)}`);
+                        files.push(fileInfo);
+                    });
+                } else if (typeof value === 'object' && value !== null) { 
+                    // It's a sub-folder object - recurse into it
+                    console.log(`"${key}" is a folder object, recursing...`);
+                    const newPath = currentPath ? `${currentPath}${key}/` : `${key}/`;
+                    const subFiles = processEntries(value, newPath);
+                    files = files.concat(subFiles);
+                    console.log(`Added ${subFiles.length} files from subfolder "${key}"`);
+                }
+            }
+            return files;
+        };
+
+        const noteFiles = processEntries(manifest.defaultNotes);
+        console.log("=== ALL FILES TO FETCH ===");
+        noteFiles.forEach((file, index) => {
+            console.log(`${index + 1}. ${file.filePath} -> folder: "${file.folder}"`);
+        });
+
+        if (!noteFiles || noteFiles.length === 0) {
+            console.warn("No default notes listed in manifest.json");
+            return {};
+        }
+
+        console.log("=== STARTING FETCHES ===");
+        const fetchPromises = noteFiles.map((fileInfo, index) =>
+            fetch(`content/${fileInfo.filePath}`)
+                .then(response => {
+                    console.log(`${index + 1}. Fetching content/${fileInfo.filePath}:`, response.ok ? 'SUCCESS' : 'FAILED');
+                    if (!response.ok) {
+                        console.error(`Failed to fetch content/${fileInfo.filePath}: ${response.status} ${response.statusText}`);
+                        return { 
+                            content: `# Error Loading File\n\nFailed to load content for ${fileInfo.filePath}.\n\nStatus: ${response.status} ${response.statusText}\nFull URL: ${response.url}`, 
+                            fileInfo,
+                            error: true 
+                        };
+                    }
+                    return response.text().then(content => {
+                        console.log(`   SUCCESS: Got ${content.length} characters for ${fileInfo.filePath}`);
+                        return { content, fileInfo, error: false };
+                    });
+                })
+                .catch(error => {
+                    console.error(`Exception fetching ${fileInfo.filePath}:`, error);
+                    return { 
+                        content: `# Network Error\n\nFailed to load ${fileInfo.filePath}\n\nError: ${error.message}`, 
+                        fileInfo,
+                        error: true 
+                    };
+                })
+        );
+
+        const noteResults = await Promise.all(fetchPromises);
+        console.log("=== PROCESSING RESULTS ===");
+
+        noteResults.forEach((result, index) => {
+            const { content, fileInfo, error } = result;
+            
+            // Extract title from filename
+            let title = fileInfo.filePath.split('/').pop().replace(/\.(md|txt)$/i, '');
+            
+            if (!error) {
+                // Try to extract title from YAML frontmatter
+                const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
+                if (yamlMatch) {
+                    const yamlContent = yamlMatch[1];
+                    const titleMatch = yamlContent.match(/^title:\s*(.+)$/m);
+                    if (titleMatch) {
+                        title = titleMatch[1].replace(/^['"]|['"]$/g, '').trim();
+                        console.log(`   Extracted title from YAML: "${title}"`);
+                    }
+                }
+            }
+            
+            const note = new Note(title, content);
+            note.folder = fileInfo.folder;
+            console.log(`Created note: "${note.title}" in folder: "${note.folder}"`);
+            notes[note.id] = note;
+        });
+
+        console.log(`=== FINAL: Created ${Object.keys(notes).length} notes ===`);
+
+    } catch (error) {
+        console.error("Error creating default notes:", error);
+        const errorNote = new Note("Error Loading Notes", 
+            `There was an issue loading the default notes: ${error.message}\n\nPlease check 'content/manifest.json' and the browser console for details.`);
+        errorNote.folder = 'root';
+        notes[errorNote.id] = errorNote;
     }
+    return notes;
+}
 
     initResizablePanes() {
         const container = document.getElementById('editorPanesContainer');
@@ -359,7 +453,6 @@ class PKMApp {
         this.updateRightSidebar();
     }
 
-    // --- CORRECTED: Modal HTML generation ---
     _showConfirmationModal(options) {
         return new Promise((resolve) => {
             const { 
@@ -554,7 +647,7 @@ class PKMApp {
         this.updatePanePreview(paneEl, note);
     }
 
-    // --- CORRECTED: Removed redundant wikilink replace logic ---
+    
     updatePanePreview(paneEl, note) {
         const previewContentEl = paneEl.querySelector('.preview-content');
         if (!previewContentEl) return;
@@ -954,30 +1047,139 @@ class PKMApp {
         }, 400);
     }
 
-    renderNoteList() {
-        const noteList = document.getElementById('noteList');
-        const sortedNotes = Object.values(this.notes).sort((a, b) => b.modified - a.modified);
-        
-        noteList.innerHTML = sortedNotes.map(note => `
-            <div class="note-item" data-note-id="${note.id}">
-                <div class="note-title">${note.title}</div>
-                <div class="note-preview">${note.getPreview()}</div>
-            </div>`).join('');
+    
+renderNoteList() {
+    const noteList = document.getElementById('noteList');
+    const sortedNotes = Object.values(this.notes).sort((a, b) => b.modified - a.modified);
 
-        noteList.querySelectorAll('.note-item').forEach(item => {
-            item.addEventListener('click', () => this.openNote(item.dataset.noteId));
-            item.addEventListener('contextmenu', (e) => { 
-                e.preventDefault(); 
-                this.showContextMenu(e, item.dataset.noteId); 
-            });
-        });
+    console.log("Rendering note list. Total notes:", sortedNotes.length);
+    
+    // Debug: Log each note's folder
+    sortedNotes.forEach(note => {
+        console.log(`Note: "${note.title}" | Folder: "${note.folder}" | ID: ${note.id}`);
+    });
+
+    const folderStructure = { _notes: [], _children: {} };
+
+    sortedNotes.forEach(note => {
+        const path = note.folder || 'root';
+        console.log(`Processing note "${note.title}" with folder path: "${path}"`);
         
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                this.updateActiveNoteInSidebar();
-            });
+        if (!path || path === "root") { 
+            // Handle root notes
+            folderStructure._notes.push(note);
+            console.log(`Added "${note.title}" to root`);
+            return;
+        }
+
+        let currentLevel = folderStructure._children;
+        const pathParts = path.split('/').filter(part => part.length > 0); // Filter empty parts
+        console.log(`Path parts for "${note.title}":`, pathParts);
+        
+        pathParts.forEach((part, index) => {
+            if (!currentLevel[part]) {
+                currentLevel[part] = { _notes: [], _children: {} };
+                console.log(`Created folder structure for: ${part}`);
+            }
+            if (index === pathParts.length - 1) {
+                currentLevel[part]._notes.push(note);
+                console.log(`Added "${note.title}" to folder: ${pathParts.join('/')}`);
+            } else {
+                currentLevel = currentLevel[part]._children;
+            }
         });
+    });
+
+    console.log("Final folder structure:", folderStructure);
+
+    const createNoteHTML = note => `
+        <div class="note-item" data-note-id="${note.id}">
+            <div class="note-title">${note.title}</div>
+            <div class="note-preview">${note.getPreview()}</div>
+        </div>`;
+    
+    const getRecursiveNoteCount = (folder) => {
+        let count = folder._notes.length;
+        for (const childKey in folder._children) {
+            count += getRecursiveNoteCount(folder._children[childKey]);
+        }
+        return count;
+    };
+
+    const createFolderHTML = (name, folder) => {
+        const totalNotesInFolder = getRecursiveNoteCount(folder);
+        console.log(`Folder "${name}" has ${totalNotesInFolder} total notes`);
+        
+        if (totalNotesInFolder === 0) {
+            console.log(`Skipping empty folder: ${name}`);
+            return ''; // Don't render empty folders
+        }
+
+        let contentsHTML = folder._notes.map(createNoteHTML).join('');
+        const sortedChildrenKeys = Object.keys(folder._children).sort();
+
+        for (const childName of sortedChildrenKeys) {
+            contentsHTML += createFolderHTML(childName, folder._children[childName]);
+        }
+
+        return `
+            <div class="folder-item">
+                <div class="folder-header">
+                    <span class="folder-arrow">▶</span>
+                    <span class="folder-name">${name}</span>
+                    <span class="folder-count">${totalNotesInFolder}</span>
+                </div>
+                <div class="folder-contents" style="display: none;">${contentsHTML}</div>
+            </div>`;
+    };
+
+    // Build the final HTML
+    let finalHTML = '';
+    
+    // Add root notes first
+    if (folderStructure._notes.length > 0) {
+        finalHTML += folderStructure._notes.map(createNoteHTML).join('');
+        console.log(`Added ${folderStructure._notes.length} root notes to HTML`);
     }
+    
+    // Add folders
+    const sortedFolderKeys = Object.keys(folderStructure._children).sort();
+    for (const folderName of sortedFolderKeys) {
+        const folderHTML = createFolderHTML(folderName, folderStructure._children[folderName]);
+        finalHTML += folderHTML;
+        console.log(`Added folder "${folderName}" to HTML`);
+    }
+    
+    console.log("Setting noteList innerHTML, total HTML length:", finalHTML.length);
+    noteList.innerHTML = finalHTML;
+
+    // Bind events to note items
+    noteList.querySelectorAll('.note-item').forEach(item => {
+        item.addEventListener('click', () => this.openNote(item.dataset.noteId));
+        item.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            this.showContextMenu(e, item.dataset.noteId);
+        });
+    });
+
+    // Bind events to folder headers
+    noteList.querySelectorAll('.folder-header').forEach(header => {
+        header.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const arrow = header.querySelector('.folder-arrow');
+            const contents = header.nextElementSibling;
+            
+            if (contents && contents.classList.contains('folder-contents')) {
+                const isOpen = contents.style.display === 'block';
+                contents.style.display = isOpen ? 'none' : 'block';
+                arrow.textContent = isOpen ? '▶' : '▼';
+                console.log(`Toggled folder "${header.querySelector('.folder-name').textContent}" - now ${isOpen ? 'closed' : 'open'}`);
+            }
+        });
+    });
+
+    requestAnimationFrame(() => this.updateActiveNoteInSidebar());
+}
 
     updateActiveNoteInSidebar() {
         requestAnimationFrame(() => {
@@ -1061,47 +1263,60 @@ class PKMApp {
     }
 
     handleAutocomplete(textarea, autocompleteManager, onSelectCallback) {
-        const cursorPos = textarea.selectionStart;
-        const textBeforeCursor = textarea.value.substring(0, cursorPos);
-        
-        const linkMatch = textBeforeCursor.match(/\[\[([^\]\[]*)$/);
-        
-        if (linkMatch) {
-            autocompleteManager.show(textarea, linkMatch, (selectedMatch) => {
-                onSelectCallback(selectedMatch, linkMatch);
-            });
-        } else {
-            autocompleteManager.hide();
-        }
+    const cursorPos = textarea.selectionStart;
+    const textBeforeCursor = textarea.value.substring(0, cursorPos);
+    
+    // This regex finds the start of a wikilink [[ and captures the text up to the cursor
+    const linkMatch = textBeforeCursor.match(/\[\[([^\]\[]*)$/);
+    
+    if (linkMatch) {
+        // Pass the captured group (the actual query string), not the whole match array.
+        const query = linkMatch[1]; 
+        autocompleteManager.show(textarea, query, (selectedMatch) => {
+            onSelectCallback(selectedMatch, linkMatch);
+        });
+    } else {
+        autocompleteManager.hide();
     }
+}
 
     afterAutocomplete(textarea, selectedMatch, originalLinkMatch, onComplete) {
-        const cursorPos = textarea.selectionStart;
-        const queryToReplace = originalLinkMatch;
-        const startOfReplace = cursorPos - queryToReplace.length;
-        
-        const textBefore = textarea.value.substring(0, startOfReplace);
-        const textAfter = textarea.value.substring(cursorPos);
+    const cursorPos = textarea.selectionStart;
+    
+    
+    // Use the full matched string (the first item in the match array) for replacement.
+    const queryToReplace = originalLinkMatch[0];
+    
 
-        if (selectedMatch.type === 'create') {
-            const newNote = new Note(selectedMatch.title);
-            this.notes[newNote.id] = newNote;
-            this.graphManager.updateNotes(this.notes);
-            this.saveNotes();
-            this.renderNoteList();
-        }
-        
-        const replacementText = `[[${selectedMatch.title}]]`;
-        textarea.value = textBefore + replacementText + textAfter;
-        const newCursorPos = startOfReplace + replacementText.length;
-        textarea.setSelectionRange(newCursorPos, newCursorPos);
-        
-        if (onComplete) {
-            onComplete();
-        }
-        
-        textarea.focus();
+    const startOfReplace = cursorPos - queryToReplace.length;
+    
+    const textBefore = textarea.value.substring(0, startOfReplace);
+    const textAfter = textarea.value.substring(cursorPos);
+
+    if (selectedMatch.type === 'create') {
+        // Create the new note if it doesn't exist
+        const note = new Note(selectedMatch.title);
+        this.notes[note.id] = note;
+        this.graphManager.updateNotes(this.notes);
+        this.saveNotes();
+        this.renderNoteList();
     }
+    
+    // Complete the wikilink
+    const replacementText = `[[${selectedMatch.title}]]`;
+    textarea.value = textBefore + replacementText + textAfter;
+    
+    // Set the cursor position to the end of the new link
+    const newCursorPos = startOfReplace + replacementText.length;
+    textarea.setSelectionRange(newCursorPos, newCursorPos);
+    
+    // Trigger any follow-up actions, like saving the note
+    if (onComplete) {
+        onComplete();
+    }
+    
+    textarea.focus();
+}
 
     searchNotes(query) {
         const noteList = document.getElementById('noteList');

@@ -8,15 +8,18 @@ tags: [welcome, getting-started]
 
 - Fork the repo at [https://github.com/shawngraham/pkmwebnotes](https://github.com/shawngraham/pkmwebnotes)
 - Add more content as .md files in the `content` subfolder
-- Add the filenames to the `content/manifest.json` file, eg:
+- Add the filenames to the `content/manifest.json` file (note that you can have subfolders), eg:
 
 ```json
 {
-  "defaultNotes": [
-    "welcome.md",
-    "python-in-notes.md",
-    "custom-deploy.md"
-  ]
+  "defaultNotes": {
+    "root": ["welcome.md", "custom-deploy.md"],
+    "python": ["python-in-notes.md", "python-examples.md"],
+    "projects": {
+      "work": ["project1.md", "project2.md"],
+      "personal": ["ideas.md"]
+    }
+  }
 }
 ```
 

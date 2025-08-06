@@ -1,9 +1,10 @@
 {
-  "defaultNotes": [
-    "welcome.md",
-    "python-in-notes.md",
-    "custom-deploy.md",
-    "what-is-pkm.md",
-    "connecting-ideas.md"
-  ]
+  "defaultNotes": {
+    "root": ["welcome.md", "custom-deploy.md"],
+    "python": ["python-in-notes.md", "python-examples.md"],
+    "projects": {
+      "work": ["project1.md", "project2.md"],
+      "personal": ["ideas.md"]
+    }
+  }
 }

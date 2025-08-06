@@ -1756,7 +1756,7 @@ body {
     transition: background-color 0.2s, border-color 0.2s;
 }
 
-/* --- FIX: Use --primary instead of --primary-color --- */
+/* ---  Use --primary instead of --primary-color --- */
 .confirm-btn.primary {
     background-color: var(--primary);
     color: white;
@@ -1775,7 +1775,7 @@ body {
     background-color: #c9302c;
 }
 
-/* --- FIX: Use --text-primary --- */
+/* ---  Use --text-primary --- */
 .confirm-btn.secondary {
     background-color: var(--bg-primary);
     color: var(--text-primary);
@@ -1784,7 +1784,7 @@ body {
     background-color: var(--bg-hover);
 }
 
-/* --- FIX: Added styles for the checkbox --- */
+/* ---  Added styles for the checkbox --- */
 .confirm-modal-skip {
     margin-top: 16px;
     padding-top: 12px;
@@ -1797,4 +1797,43 @@ body {
     align-items: center;
     gap: 8px;
     cursor: pointer;
+}
+
+.folder-item {
+    margin: 4px 0;
+}
+
+.folder-header {
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.folder-header:hover {
+    background: var(--bg-hover);
+}
+
+.folder-arrow {
+    font-size: 10px;
+    width: 12px;
+}
+
+.folder-name {
+    flex: 1;
+    font-weight: 500;
+}
+
+.folder-count {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.folder-contents {
+    margin-left: 20px;
+    margin-top: 4px;
 }
