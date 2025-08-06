@@ -10,30 +10,43 @@ export class BacklinksManager {
     }
 
     getBacklinks(noteTitle) {
-        const backlinks = [];
-        
-        Object.values(this.notes).forEach(note => {
-            const outgoingLinks = note.getOutgoingLinks();
-            if (outgoingLinks.some(link => link.toLowerCase() === noteTitle.toLowerCase())) {
-                // Find the context around the link
-                const escapedTitle = noteTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const linkRegex = new RegExp(`\\[\\[${escapedTitle}\\]\\]`, 'gi');
-                const matches = [...note.content.matchAll(linkRegex)];
+    const backlinks = [];
+    const lowerNoteTitle = noteTitle.toLowerCase();
+    
+    // This regex finds all wikilinks and captures their target (before the '|')
+    const linkFindingRegex = /\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g;
+
+    Object.values(this.notes).forEach(note => {
+        // A note should not be its own backlink
+        if (note.title.toLowerCase() === lowerNoteTitle) {
+            return;
+        }
+
+        // Find all wikilinks within the note's content
+        const matches = [...note.content.matchAll(linkFindingRegex)];
+
+        matches.forEach(match => {
+            const linkTarget = match[1].trim(); // This is the part before '|' or ']]'
+            
+            // Check if the link target matches the note we're looking for
+            if (linkTarget.toLowerCase() === lowerNoteTitle) {
+                const fullMatchText = match[0];
+                const matchIndex = match.index;
+
+                // Extract the context around the found link
+                const start = Math.max(0, matchIndex - 50);
+                const end = Math.min(note.content.length, matchIndex + fullMatchText.length + 50);
+                const context = note.content.substring(start, end).trim();
                 
-                matches.forEach(match => {
-                    const start = Math.max(0, match.index - 50);
-                    const end = Math.min(note.content.length, match.index + match[0].length + 50);
-                    const context = note.content.substring(start, end).trim();
-                    
-                    backlinks.push({
-                        noteId: note.id,
-                        noteTitle: note.title,
-                        context: context
-                    });
+                backlinks.push({
+                    noteId: note.id,
+                    noteTitle: note.title,
+                    context: context
                 });
             }
         });
-        
-        return backlinks;
-    }
+    });
+    
+    return backlinks;
+}
 }

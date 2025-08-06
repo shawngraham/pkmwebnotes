@@ -11,6 +11,8 @@ class PKMApp {
     constructor() {
         this.notes = this.loadNotes();
         this.settings = storage.get('pkm_settings', { theme: 'light', skipDeleteConfirm: false });
+        this.activeNoteId = null;
+        this.sortOrder = storage.get('pkm_sort_order', 'alphabetical');
 
         this.panes = storage.get('pkm_panes', []);
         this.focusedPaneId = storage.get('pkm_focused_pane', null);
@@ -32,31 +34,35 @@ class PKMApp {
     
     
     setupMarked() {
-        const wikilinkExtension = {
-            name: 'wikilink',
-            level: 'inline',
-            start: (src) => src.indexOf('[['),
-            tokenizer(src) {
-                const rule = /^\[\[([^\]]+)\]\]/;
-                const match = rule.exec(src);
-                if (match) {
-                    return {
-                        type: 'wikilink',
-                        raw: match[0],         
-                        text: match[1].trim(), 
-                    };
-                }
-            },
-            renderer(token) {
-                const text = token.text;
-                const exists = this.parser.options.notesMap[text.toLowerCase()];
-                const className = exists ? 'wikilink' : 'wikilink broken';
-                return `<span class="${className}" data-link="${text}">${text}</span>`;
+    const wikilinkExtension = {
+        name: 'wikilink',
+        level: 'inline',
+        start: (src) => src.indexOf('[['),
+        tokenizer(src) {
+            // Updated regex to capture both link target and optional display text
+            const rule = /^\[\[([^\]|]+)(\|([^\]]+))?\]\]/;
+            const match = rule.exec(src);
+            if (match) {
+                return {
+                    type: 'wikilink',
+                    raw: match[0],           // Full match: [[Page Title|Display Text]]
+                    target: match[1].trim(), // The actual page to link to
+                    text: match[3] ? match[3].trim() : match[1].trim(), // Display text or fallback to target
+                };
             }
-        };
+        },
+        renderer(token) {
+            const target = token.target;
+            const displayText = token.text;
+            const exists = this.parser.options.notesMap[target.toLowerCase()];
+            const className = exists ? 'wikilink' : 'wikilink broken';
+            // Use target for the data-link attribute (for navigation) and displayText for what's shown
+            return `<span class="${className}" data-link="${target}" title="${target}">${displayText}</span>`;
+        }
+    };
 
-        marked.use({ extensions: [wikilinkExtension] });
-    }
+    marked.use({ extensions: [wikilinkExtension] });
+}
     
     bindPyodideStatus() {
         this.pyodideManager.setStatusCallback((status, message) => {
@@ -114,7 +120,7 @@ class PKMApp {
         document.querySelector('.sidebar').addEventListener('contextmenu', e => {
             if (!e.target.closest('.note-item')) {
                 e.preventDefault();
-                this.showContextMenu(e, null);
+                this.showContextMenu(e, { type: 'sidebar' }); 
             }
         });
     }
@@ -277,7 +283,11 @@ async createDefaultNotes() {
         document.getElementById('exportBtn').addEventListener('click', () => this.exportNotes());
         document.getElementById('searchInput').addEventListener('input', debounce((e) => this.searchNotes(e.target.value), 300));
         document.getElementById('fileInput').addEventListener('change', (e) => this.handleFileImport(e));
-        
+        document.getElementById('noteListHeader').addEventListener('contextmenu', (e) => {
+    e.preventDefault(); // Prevent the default browser right-click menu
+    e.stopPropagation(); // Stops the event from also triggering the general sidebar listener
+    this.showContextMenu(e, { type: 'header' });
+});
         document.addEventListener('keydown', (e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
                 e.preventDefault();
@@ -654,17 +664,19 @@ async createDefaultNotes() {
 
         let content = note.getContentWithoutMetadata();
 
-        content = content.replace(/!\[\[([^#\]]+)#\^([^\]]+)\]\]/g, (match, noteTitle, blockId) => {
-            const targetNote = Object.values(this.notes).find(n => n.title.toLowerCase() === noteTitle.trim().toLowerCase());
-            if (targetNote) {
-                const blockContent = targetNote.getBlockContent(blockId.trim());
-                if (blockContent) {
-                    return `<div class="embedded-block">${marked.parse(blockContent)}<div class="embedded-block-source">From: <span class="wikilink" data-link="${targetNote.title}">${targetNote.title}</span></div></div>`;
-                }
-                return `<div class="broken-embed">Block <code>^${blockId}</code> not found in "${noteTitle}"</div>`;
-            }
-            return `<div class="broken-embed">Note "${noteTitle}" not found</div>`;
-        });
+        content = content.replace(/!\[\[([^#\]|]+)(\|([^\]]+))?#\^([^\]]+)\]\]/g, (match, noteTitle, pipe, displayText, blockId) => {
+    const targetNote = Object.values(this.notes).find(n => n.title.toLowerCase() === noteTitle.trim().toLowerCase());
+    if (targetNote) {
+        const blockContent = targetNote.getBlockContent(blockId.trim());
+        if (blockContent) {
+            const embedTitle = displayText || noteTitle; // Use display text if provided
+            return `<div class="embedded-block">${marked.parse(blockContent)}<div class="embedded-block-source">From: <span class="wikilink" data-link="${noteTitle}">${embedTitle}</span></div></div>`;
+        }
+        return `<div class="broken-embed">Block <code>^${blockId}</code> not found in "${noteTitle}"</div>`;
+    }
+    return `<div class="broken-embed">Note "${noteTitle}" not found</div>`;
+});
+
 
         const codeBlockRegex = /(```python\n[\s\S]*?\n```)/g;
         const parts = content.split(codeBlockRegex);
@@ -1047,10 +1059,34 @@ async createDefaultNotes() {
         }, 400);
     }
 
+/**
+ * Sets the sort order, saves it, and re-renders the note list.
+ * @param {string} order - The new sort order ('alphabetical', 'modified-desc', 'modified-asc').
+ */
+setSortOrder(order) {
+    this.sortOrder = order;
+    storage.set('pkm_sort_order', this.sortOrder); // Save the preference
+    this.renderNoteList();
+}
     
 renderNoteList() {
     const noteList = document.getElementById('noteList');
-    const sortedNotes = Object.values(this.notes).sort((a, b) => b.modified - a.modified);
+    const notesArray = Object.values(this.notes);
+    let sortedNotes;
+
+    // Sort the array based on the current sortOrder
+    switch (this.sortOrder) {
+        case 'alphabetical':
+            sortedNotes = notesArray.sort((a, b) => a.title.localeCompare(b.title)); [2, 3]
+            break;
+        case 'modified-asc': // Sort by oldest first
+            sortedNotes = notesArray.sort((a, b) => a.modified - b.modified);
+            break;
+        case 'modified-desc': // Sort by most recent first
+        default: // Default case also handles 'modified-desc'
+            sortedNotes = notesArray.sort((a, b) => b.modified - a.modified);
+            break;
+    }
 
     console.log("Rendering note list. Total notes:", sortedNotes.length);
     
@@ -1158,7 +1194,7 @@ renderNoteList() {
         item.addEventListener('click', () => this.openNote(item.dataset.noteId));
         item.addEventListener('contextmenu', (e) => {
             e.preventDefault();
-            this.showContextMenu(e, item.dataset.noteId);
+            this.showContextMenu(e, { type: 'note', noteId: item.dataset.noteId });
         });
     });
 
@@ -1199,63 +1235,88 @@ renderNoteList() {
         });
     }
 
-    showContextMenu(event, noteId) {
-        this.hideContextMenu();
-        const menu = document.createElement('div');
-        menu.id = 'context-menu';
-        menu.className = 'context-menu';
+    showContextMenu(event, context = {}) {
+    this.hideContextMenu(); // Close any existing menu first
 
-        let menuItems = '';
+    const menu = document.createElement('div');
+    menu.id = 'context-menu';
+    menu.className = 'context-menu';
 
-        if (noteId) {
+    let menuItems = '';
+
+    // The 'check' helper function adds a ✔ to the active sort order
+    const check = (order) => this.sortOrder === order ? '✔ ' : '';
+
+    // Build menu items based on the context of the click
+    switch (context.type) {
+        case 'note':
+            // This is when a specific note is right-clicked
+            const noteId = context.noteId;
             const pane = this.panes.find(p => p.noteId === noteId);
             const isMaximized = this.resizablePanes && this.resizablePanes.getMaximizedPane() === pane?.id;
-            
+
             menuItems = `
+                <button class="context-menu-item" data-action="open-pane" data-note-id="${noteId}">✨ Open in New Pane</button>
+                ${pane ? `<button class="context-menu-item" data-action="toggle-maximize" data-pane-id="${pane.id}">${isMaximized ? '🗗 Minimize Pane' : '🗖 Maximize Pane'}</button>` : ''}
+                <div class="context-menu-separator"></div>
+                <button class="context-menu-item" data-action="delete" data-note-id="${noteId}">🗑️ Delete Note</button>
+                <div class="context-menu-separator"></div>
                 <button class="context-menu-item" data-action="new-note">📝 New Note</button>
-                <div class="context-menu-separator"></div>
-                <button class="context-menu-item" data-action="open-pane">✨ Open in New Pane</button>
-                ${pane ? `<button class="context-menu-item" data-action="toggle-maximize">${isMaximized ? '🗗 Minimize Pane' : '🗖 Maximize Pane'}</button>` : ''}
-                <div class="context-menu-separator"></div>
-                <button class="context-menu-item" data-action="delete">🗑️ Delete Note</button>
             `;
-        } else {
-            menuItems = `<button class="context-menu-item" data-action="new-note">📝 New Note</button>`;
+            break;
+
+        case 'header':
+        case 'sidebar':
+        default:
+            // This is for the "All Notes" header or empty sidebar space
+            menuItems = `
+                <div class="context-menu-title">Sort Notes By</div>
+                <button class="context-menu-item" data-sort="alphabetical">${check('alphabetical')}Alphabetical (A-Z)</button>
+                <button class="context-menu-item" data-sort="modified-desc">${check('modified-desc')}Most Recent</button>
+                <button class="context-menu-item" data-sort="modified-asc">${check('modified-asc')}Oldest First</button>
+                <div class="context-menu-separator"></div>
+                <button class="context-menu-item" data-action="new-note">📝 New Note</button>
+            `;
+            break;
+    }
+
+    menu.innerHTML = menuItems;
+    document.body.appendChild(menu);
+    menu.style.top = `${event.clientY}px`;
+    menu.style.left = `${event.clientX}px`;
+
+    // A single, powerful event listener for all menu actions
+    menu.addEventListener('click', (e) => {
+        const target = e.target.closest('button.context-menu-item');
+        if (!target) return;
+
+        const action = target.dataset.action;
+        const sortOrder = target.dataset.sort;
+        const noteId = target.dataset.noteId;
+        const paneId = target.dataset.paneId;
+
+        if (sortOrder) {
+            this.setSortOrder(sortOrder);
         }
 
-        menu.innerHTML = menuItems;
-        document.body.appendChild(menu);
-        menu.style.top = `${event.clientY}px`;
-        menu.style.left = `${event.clientX}px`;
-        
-        menu.querySelector('[data-action="new-note"]').addEventListener('click', () => { 
-            this.createNote(); 
-            this.hideContextMenu(); 
-        });
-        
-        if (noteId) {
-            menu.querySelector('[data-action="delete"]').addEventListener('click', (e) => {  
-                this.deleteNote(noteId, e); 
-                this.hideContextMenu(); 
-            });
-            
-            menu.querySelector('[data-action="open-pane"]').addEventListener('click', () => { 
-                this.openNoteInNewPane(noteId); 
-                this.hideContextMenu(); 
-            });
-            
-            const toggleMaxBtn = menu.querySelector('[data-action="toggle-maximize"]');
-            if (toggleMaxBtn) {
-                toggleMaxBtn.addEventListener('click', () => { 
-                    const pane = this.panes.find(p => p.noteId === noteId);
-                    if (pane && this.resizablePanes) {
-                        this.resizablePanes.toggleMaximize(pane.id);
-                    }
-                    this.hideContextMenu(); 
-                });
-            }
+        switch (action) {
+            case 'new-note':
+                this.createNote();
+                break;
+            case 'open-pane':
+                this.openNoteInNewPane(noteId);
+                break;
+            case 'toggle-maximize':
+                if (paneId && this.resizablePanes) this.resizablePanes.toggleMaximize(paneId);
+                break;
+            case 'delete':
+                this.deleteNote(noteId, e);
+                break;
         }
-    }
+
+        this.hideContextMenu();
+    });
+}
 
     hideContextMenu() {
         const menu = document.getElementById('context-menu');
@@ -1265,29 +1326,27 @@ renderNoteList() {
     handleAutocomplete(textarea, autocompleteManager, onSelectCallback) {
     const cursorPos = textarea.selectionStart;
     const textBeforeCursor = textarea.value.substring(0, cursorPos);
-    
-    // This regex finds the start of a wikilink [[ and captures the text up to the cursor
-    const linkMatch = textBeforeCursor.match(/\[\[([^\]\[]*)$/);
-    
+
+    // This updated regex will only match when the cursor is inside the link target part,
+    // before any '|' or ']]'
+    const linkMatch = textBeforeCursor.match(/\[\[([^\]|]*)$/);
+
     if (linkMatch) {
-        // Pass the captured group (the actual query string), not the whole match array.
-        const query = linkMatch[1]; 
+        // The query is the text immediately following '[['
+        const query = linkMatch[1];
+        
         autocompleteManager.show(textarea, query, (selectedMatch) => {
             onSelectCallback(selectedMatch, linkMatch);
         });
     } else {
+        // If the regex doesn't match (e.g., after a '|'), hide the autocomplete
         autocompleteManager.hide();
     }
 }
 
     afterAutocomplete(textarea, selectedMatch, originalLinkMatch, onComplete) {
     const cursorPos = textarea.selectionStart;
-    
-    
-    // Use the full matched string (the first item in the match array) for replacement.
     const queryToReplace = originalLinkMatch[0];
-    
-
     const startOfReplace = cursorPos - queryToReplace.length;
     
     const textBefore = textarea.value.substring(0, startOfReplace);
@@ -1302,15 +1361,24 @@ renderNoteList() {
         this.renderNoteList();
     }
     
-    // Complete the wikilink
-    const replacementText = `[[${selectedMatch.title}]]`;
+    let replacementText;
+    
+    // Check if we were typing in the display text part (after |)
+    if (originalLinkMatch[3] !== undefined) {
+        // We were typing display text, keep the target and replace display text
+        const target = originalLinkMatch[1];
+        replacementText = `[[${target}|${selectedMatch.title}]]`;
+    } else {
+        // We were typing the target, create a simple wikilink
+        replacementText = `[[${selectedMatch.title}]]`;
+    }
+    
     textarea.value = textBefore + replacementText + textAfter;
     
     // Set the cursor position to the end of the new link
     const newCursorPos = startOfReplace + replacementText.length;
     textarea.setSelectionRange(newCursorPos, newCursorPos);
     
-    // Trigger any follow-up actions, like saving the note
     if (onComplete) {
         onComplete();
     }
@@ -1635,6 +1703,8 @@ renderNoteList() {
     document.addEventListener('keydown', handleEsc);
 }
 }
+
+ 
 
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new PKMApp();

@@ -131,14 +131,16 @@ tags: []
     }
 
     getOutgoingLinks() {
-        const links = [];
-        const linkRegex = /\[\[([^\]]+)\]\]/g;
-        let match;
-        
-        while ((match = linkRegex.exec(this.content)) !== null) {
-            links.push(match[1].trim());
-        }
-        
-        return [...new Set(links)]; // Remove duplicates
+    const links = [];
+    // Updated regex to capture the target part of wikilinks (before the |)
+    const linkRegex = /\[\[([^\]|]+)(\|([^\]]+))?\]\]/g;
+    let match;
+    
+    while ((match = linkRegex.exec(this.content)) !== null) {
+        // Use the target (first capture group), not the display text
+        links.push(match[1].trim());
     }
+    
+    return [...new Set(links)]; // Remove duplicates
+}
 }
