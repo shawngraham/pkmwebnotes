@@ -5,6 +5,7 @@ import { GraphManager } from './graph.js';
 import { ResizablePanes } from './resizable-panes.js';
 import { AutocompleteManager } from './autocomplete.js';
 import { storage, debounce } from './utils.js'; 
+import { RightSidebar } from './rightsidebar.js';
 
 // Main PKM Application Class
 class PKMApp {
@@ -109,6 +110,7 @@ class PKMApp {
         this.loadInitialPanes();
         this.updateRightSidebar();
         this.initResizablePanes();
+        new RightSidebar('toggle-right-sidebar', '.main', this.resizablePanes);
         this.showWelcomeModal();
         
         document.addEventListener('click', (e) => {

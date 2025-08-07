@@ -102,9 +102,25 @@ body {
 }
 
 .header-actions {
+    margin-left: auto; /* Pushes the entire action group to the right */
     display: flex;
-    gap: 8px;
     align-items: center;
+    gap: 8px;
+}
+
+.header-byline {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-left: 16px; /* Adds some space between the last button and the text */
+    white-space: nowrap; /* Prevents the text from wrapping awkwardly */
+}
+
+.header-byline a {
+    color: var(--primary);
+    text-decoration: none;
+}
+.header-byline a:hover {
+    text-decoration: underline;
 }
 
 /* Pyodide Status Indicator */
@@ -884,6 +900,35 @@ body {
 
 .right-sidebar-content {
     padding: 8px;
+}
+
+.main.right-sidebar-collapsed {
+    grid-template-columns: 280px minmax(0, 1fr) 0;
+}
+
+.main.right-sidebar-collapsed .right-sidebar {
+    width: 0;
+    min-width: 0;
+    padding: 0;
+    border-left: none;
+    overflow: hidden;
+}
+
+#toggle-right-sidebar {
+    margin-left: 8px;
+    font-size: 16px;
+    padding: 6px 10px;
+    /* Ensure it has a z-index if it ever overlaps */
+    position: relative; 
+    z-index: 1;
+}
+
+#toggle-right-sidebar i {
+    transition: transform 0.3s ease-in-out;
+}
+
+.main.right-sidebar-collapsed #toggle-right-sidebar i {
+    transform: rotate(90deg);
 }
 
 .sidebar-section {
@@ -1837,3 +1882,14 @@ body {
     margin-left: 20px;
     margin-top: 4px;
 }
+
+/* --- Right Sidebar Toggle Styles --- */
+
+.main.right-sidebar-collapsed .right-sidebar {
+    width: 0;
+    min-width: 0;
+    padding: 0;
+    border-left: none;
+    overflow: hidden;
+}
+
