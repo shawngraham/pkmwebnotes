@@ -742,12 +742,14 @@ async createDefaultNotes() {
         let content = note.getContentWithoutMetadata();
 
         content = content.replace(/!\[\[([^#\]|]+)(\|([^\]]+))?#\^([^\]]+)\]\]/g, (match, noteTitle, pipe, displayText, blockId) => {
-        const targetNote = Object.values(this.notes).find(n => n.title.toLowerCase() === noteTitle.trim().toLowerCase());
-        if (targetNote) {
-          const blockContent = targetNote.getBlockContent(blockId.trim());
-         if (blockContent) {
-            const embedTitle = displayText || noteTitle; // Use display text if provided
-            return `<div class="embedded-block">${marked.parse(blockContent)}<div class="embedded-block-source">From: <span class="wikilink" data-link="${noteTitle}">${embedTitle}</span></div></div>`;
+    const targetNote = Object.values(this.notes).find(n => n.title.toLowerCase() === noteTitle.trim().toLowerCase());
+    if (targetNote) {
+        const blockContent = targetNote.getBlockContent(blockId.trim());
+        if (blockContent) {
+            const embedTitle = displayText || noteTitle;
+            // CORRECTED: Use this.md.render() instead of marked.parse()
+            const renderedBlock = this.md.render(blockContent);
+            return `<div class="embedded-block">${renderedBlock}<div class="embedded-block-source">From: <span class="wikilink" data-link="${targetNote.id}">${embedTitle}</span></div></div>`;
         }
         return `<div class="broken-embed">Block <code>^${blockId}</code> not found in "${noteTitle}"</div>`;
     }
