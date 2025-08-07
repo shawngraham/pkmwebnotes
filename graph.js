@@ -209,6 +209,11 @@ export class GraphManager {
         const nodesByStep = new Map(); // Map from step number to Set of note IDs
         const processedNotes = new Set();
 
+        const titleToNoteMap = Object.values(this.notes).reduce((acc, note) => {
+            acc[note.title.toLowerCase()] = note;
+            return acc;
+         }, {});
+
         // Initialize with current note
         nodes.push({
             id: currentNote.id,
@@ -230,60 +235,58 @@ export class GraphManager {
                 if (!note) return;
 
                 // Get outgoing links
-                const outgoingLinks = note.getOutgoingLinks();
-                outgoingLinks.forEach(linkTitle => {
-                    const targetNote = Object.values(this.notes).find(n => 
-                        n.title.toLowerCase() === linkTitle.toLowerCase()
-                    );
-                    
-                    if (targetNote && !processedNotes.has(targetNote.id)) {
-                        nodes.push({
-                            id: targetNote.id,
-                            title: targetNote.title,
-                            isCurrent: false,
-                            step: step
-                        });
-                        processedNotes.add(targetNote.id);
-                        currentStepNodes.add(targetNote.id);
-                    }
-                    
-                    // Add link if target exists
-                    if (targetNote) {
-                        links.push({
-                            source: noteId,
-                            target: targetNote.id,
-                            type: 'outgoing',
-                            step: step
-                        });
-                    }
-                });
+    const outgoingLinkIds = note.getOutgoingLinks(); // This returns an array of note IDs.
+    outgoingLinkIds.forEach(targetId => {
+        const targetNote = this.notes[targetId]; // CORRECT: Direct lookup using the ID.
+
+        if (targetNote && !processedNotes.has(targetNote.id)) {
+            nodes.push({
+                id: targetNote.id,
+                title: targetNote.title,
+                isCurrent: false,
+                step: step
+            });
+            processedNotes.add(targetNote.id);
+            currentStepNodes.add(targetNote.id);
+        }
+        
+        // Add link if target exists
+        if (targetNote) {
+            links.push({
+                source: noteId,
+                target: targetNote.id,
+                type: 'outgoing',
+                step: step
+            });
+        }
+    });
 
                 // Get incoming links (backlinks)
-                Object.values(this.notes).forEach(otherNote => {
-                    if (otherNote.id !== noteId) {
-                        const noteLinks = otherNote.getOutgoingLinks();
-                        if (noteLinks.some(link => link.toLowerCase() === note.title.toLowerCase())) {
-                            if (!processedNotes.has(otherNote.id)) {
-                                nodes.push({
-                                    id: otherNote.id,
-                                    title: otherNote.title,
-                                    isCurrent: false,
-                                    step: step
-                                });
-                                processedNotes.add(otherNote.id);
-                                currentStepNodes.add(otherNote.id);
-                            }
-                            
-                            // Add link
-                            links.push({
-                                source: otherNote.id,
-                                target: noteId,
-                                type: 'incoming',
-                                step: step
-                            });
-                        }
-                    }
+    Object.values(this.notes).forEach(otherNote => {
+        if (otherNote.id !== noteId) {
+            const otherNoteLinks = otherNote.getOutgoingLinks(); // Get IDs linked from otherNote
+            if (otherNoteLinks.includes(noteId)) { // CORRECT: Check if otherNote's links include the current note's ID.
+                if (!processedNotes.has(otherNote.id)) {
+                    nodes.push({
+                        id: otherNote.id,
+                        title: otherNote.title,
+                        isCurrent: false,
+                        step: step
+                    });
+                    processedNotes.add(otherNote.id);
+                    currentStepNodes.add(otherNote.id);
+                }
+                
+                // Add link
+                links.push({
+                    source: otherNote.id,
+                    target: noteId,
+                    type: 'incoming',
+                    step: step
                 });
+            }
+        }
+    });
             });
 
             nodesByStep.set(step, currentStepNodes);

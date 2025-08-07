@@ -130,10 +130,9 @@ export class AutocompleteManager {
         this.selectedIndex = -1;
     }
 
-    getMatches(query) {
+        getMatches(query) {
         console.log('Getting matches for query:', query);
         
-        // If no query, return empty array - we'll handle this in show()
         if (query === '') return [];
 
         const lowerQuery = query.toLowerCase();
@@ -142,17 +141,20 @@ export class AutocompleteManager {
 
         Object.values(this.notes).forEach(note => {
             const lowerTitle = note.title.toLowerCase();
+            // The match object includes the stable ID!
+            const matchData = { title: note.title, id: note.id, type: 'existing' };
+            
             if (lowerTitle === lowerQuery) {
-                exactMatches.push({ title: note.title, type: 'existing' });
+                exactMatches.push(matchData);
             } else if (lowerTitle.includes(lowerQuery)) {
-                partialMatches.push({ title: note.title, type: 'existing' });
+                partialMatches.push(matchData);
             }
         });
 
         const results = [...exactMatches, ...partialMatches].slice(0, 8);
         
-        // Add "create new" option if no exact match and query is not empty
         if (!exactMatches.length && query.trim()) {
+            // "Create" option doesn't have an ID yet.
             results.unshift({ title: query, type: 'create' });
         }
 

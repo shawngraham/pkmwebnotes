@@ -36,76 +36,66 @@ class PKMApp {
     
     
         setupMarkdownParser() {
-    // 1. WIKILINK PLUGIN: Define the custom rule for markdown-it
     const wikilinkPlugin = (md) => {
-        const wikilinkRegex = /\[\[([^\]|]+)(\|([^\]]+))?\]\]/;
+        // This regex looks for an ID and display text separated by a pipe
+        const wikilinkRegex = /\[\[([^|\]]+)\|([^\]]+)\]\]/;
 
         function wikilinkTokenizer(state, silent) {
             const match = wikilinkRegex.exec(state.src.slice(state.pos));
             if (!match) { return false; }
 
             const fullMatch = match[0];
-            const target = match[1].trim();
-            const text = match[3] ? match[3].trim() : target;
+            const id = match[1].trim();
+            const text = match[2].trim();
 
             if (!silent) {
                 const token = state.push('wikilink_open', 'span', 1);
-                token.attrs = [['class', 'wikilink'], ['data-link', target], ['title', target]];
+                // The data-link attribute holds the STABLE ID
+                token.attrs = [['class', 'wikilink'], ['data-link', id], ['title', `Link to: ${text}`]];
                 
                 const textToken = state.push('text', '', 0);
                 textToken.content = text;
                 
                 state.push('wikilink_close', 'span', -1);
             }
-
             state.pos += fullMatch.length;
             return true;
         }
 
         md.inline.ruler.before('link', 'wikilink', wikilinkTokenizer);
 
-        // Add a renderer rule to handle the 'broken' class
+        // The renderer checks for the note's existence using the ID
         md.renderer.rules.wikilink_open = (tokens, idx, options, env, self) => {
             const token = tokens[idx];
-            const target = token.attrGet('data-link');
+            const id = token.attrGet('data-link');
             
-            // =======================================================
-            // V V V V V V V V V  THE BUG FIX IS HERE V V V V V V V V V
-            // =======================================================
-            // We must get notesMap from `env`, not `options`.
-            const notesMap = env.notesMap || {}; 
-            // =======================================================
-
-            const exists = notesMap[target.toLowerCase()];
+            const notes = env.notes || {};
+            const exists = notes[id]; // Direct ID lookup
             
             if (!exists) {
                 token.attrJoin('class', 'broken');
+            } else {
+                //Update the title attribute to the note's current title
+                token.attrSet('title', `Link to: ${exists.title}`);
             }
 
             return self.renderToken(tokens, idx, options);
         };
     };
 
-    // Initialize markdown-it and set the highlight option correctly
+    // Initialize markdown-it 
     const mdInstance = window.markdownit({
-        html: true,
-        linkify: true,
-        typographer: true,
-        tables: true,
+        html: true, linkify: true, typographer: true, tables: true,
     }).use(wikilinkPlugin);
 
     mdInstance.options.highlight = function (str, lang) {
         if (lang && hljs.getLanguage(lang)) {
             try {
-                return '<pre class="hljs"><code>' +
-                       hljs.highlight(str, { language: lang, ignoreIllegals: true }).value +
-                       '</code></pre>';
+                return '<pre class="hljs"><code>' + hljs.highlight(str, { language: lang, ignoreIllegals: true }).value + '</code></pre>';
             } catch (__) {}
         }
         return '<pre class="hljs"><code>' + mdInstance.utils.escapeHtml(str) + '</code></pre>';
     };
-
-    // Assign the fully configured instance to the class property.
     this.md = mdInstance;
 }
     
@@ -578,7 +568,7 @@ async createDefaultNotes() {
         });
     }
 
-    renderAllPanes() {
+        renderAllPanes() {
         const container = document.getElementById('editorPanesContainer');
         if (this.panes.length === 0) {
             container.innerHTML = `<div class="empty-state"><h3>Welcome to PKM Notes</h3><p>Select a note or create a new one.</p></div>`;
@@ -629,6 +619,9 @@ async createDefaultNotes() {
     }
 
     getEditorHTML(note, pane) {
+        // Convert content to display format for the editor
+        const displayContent = this.convertToDisplayFormat(note.content);
+        
         return `
             <div class="editor-header">
                 <div class="editor-title-wrapper">
@@ -643,56 +636,94 @@ async createDefaultNotes() {
             </div>
             <div class="editor-content ${pane.mode}-mode">
                 <div class="editor-pane" style="position: relative;">
-                    <textarea class="editor-textarea" placeholder="Start writing...">${note.content}</textarea>
+                    <textarea class="editor-textarea" placeholder="Start writing...">${displayContent}</textarea>
                 </div>
                 <div class="preview-pane"><div class="preview-content"></div></div>
             </div>
             <div class="status-bar"><span class="save-status">Saved</span></div>`;
     }
 
-    bindPaneEvents(paneEl, pane) {
+       bindPaneEvents(paneEl, pane) {
         const textarea = paneEl.querySelector('.editor-textarea');
         const autocompleteManager = new AutocompleteManager(this.notes, paneEl.querySelector('.editor-pane'));
         let originalTitle = this.notes[pane.noteId].title;
+        
         paneEl.addEventListener('click', () => this.setFocusedPane(pane.id));
-        paneEl.querySelector('.close-pane-btn').addEventListener('click', (e) => { e.stopPropagation(); this.closePane(pane.id); });
-        paneEl.querySelectorAll('.mode-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => { e.stopPropagation(); pane.mode = btn.dataset.mode; this.renderAllPanes(); });
+        paneEl.querySelector('.close-pane-btn').addEventListener('click', (e) => { 
+            e.stopPropagation(); 
+            this.closePane(pane.id); 
         });
-        textarea.addEventListener('input', debounce(() => this.saveNoteFromPane(pane.id, originalTitle), 1500));
-        textarea.addEventListener('input', () => {
-            const note = this.notes[pane.noteId];
-            note.update(textarea.value, false);
-            this.updatePaneContent(paneEl, note);
-            this.updateRightSidebar();
-            this.handleAutocomplete(textarea, autocompleteManager, (selectedMatch, originalLinkMatch) => {
-                this.afterAutocomplete(textarea, selectedMatch, originalLinkMatch, () => {
-                note.update(textarea.value, false);
-                this.updatePaneContent(paneEl, note);
-                 });
+        
+        paneEl.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => { 
+                e.stopPropagation(); 
+                pane.mode = btn.dataset.mode; 
+                this.renderAllPanes(); 
             });
         });
-        paneEl.addEventListener('focus', () => { originalTitle = this.notes[pane.noteId].title; }, true);
-        textarea.addEventListener('keydown', (e) => { if (autocompleteManager.handleKeyDown(e)) e.preventDefault(); });
+        
+        // Save with debounce
+        textarea.addEventListener('input', debounce(() => this.saveNoteFromPane(pane.id, originalTitle), 1500));
+        
+        // Real-time preview update
+        textarea.addEventListener('input', () => {
+            const note = this.notes[pane.noteId];
+            const displayContent = textarea.value;
+            const internalContent = this.convertToInternalFormat(displayContent);
+            
+            // Update note content for preview (without triggering save)
+            note.update(internalContent, false);
+            this.updatePaneContent(paneEl, note);
+            this.updateRightSidebar();
+            
+            this.handleAutocomplete(textarea, autocompleteManager, (selectedMatch, originalLinkMatch) => {
+                this.afterAutocomplete(textarea, selectedMatch, originalLinkMatch, () => {
+                    const updatedDisplayContent = textarea.value;
+                    const updatedInternalContent = this.convertToInternalFormat(updatedDisplayContent);
+                    note.update(updatedInternalContent, false);
+                    this.updatePaneContent(paneEl, note);
+                });
+            });
+        });
+        
+        paneEl.addEventListener('focus', () => { 
+            originalTitle = this.notes[pane.noteId].title; 
+        }, true);
+        
+        textarea.addEventListener('keydown', (e) => { 
+            if (autocompleteManager.handleKeyDown(e)) e.preventDefault(); 
+        });
+        
         textarea.addEventListener('blur', () => setTimeout(() => autocompleteManager.hide(), 200));
     }
     
-    saveNoteFromPane(paneId, originalTitle = null) {
+        saveNoteFromPane(paneId, originalTitle = null) {
         const pane = this.getPane(paneId);
         if (!pane) return;
+        
         const paneEl = document.querySelector(`.editor-container[data-pane-id="${paneId}"]`);
         if (!paneEl) return;
+        
         const note = this.notes[pane.noteId];
-        const content = paneEl.querySelector('.editor-textarea').value;
+        const displayContent = paneEl.querySelector('.editor-textarea').value;
+        
+        // Convert display format back to internal format before saving
+        const internalContent = this.convertToInternalFormat(displayContent);
+        
         const oldTitle = originalTitle || note.title;
-        note.update(content, true);
+        note.update(internalContent, true);
+        
         if (oldTitle !== note.title) {
+            // Handle rename - this will update links in other notes
+            this.handleNoteRename(note, oldTitle);
             this.renderNoteList();
-            this.renderAllPanes();
+            this.renderAllPanes(); // This will refresh all editors with updated display format
         } else {
+            // Update just this pane's title
             paneEl.querySelector('.editor-title').textContent = note.title;
             paneEl.querySelector('.save-status').textContent = `Saved`;
         }
+        
         this.saveNotes();
         this.backlinksManager.updateNotes(this.notes);
         this.graphManager.updateNotes(this.notes);
@@ -711,10 +742,10 @@ async createDefaultNotes() {
         let content = note.getContentWithoutMetadata();
 
         content = content.replace(/!\[\[([^#\]|]+)(\|([^\]]+))?#\^([^\]]+)\]\]/g, (match, noteTitle, pipe, displayText, blockId) => {
-    const targetNote = Object.values(this.notes).find(n => n.title.toLowerCase() === noteTitle.trim().toLowerCase());
-    if (targetNote) {
-        const blockContent = targetNote.getBlockContent(blockId.trim());
-        if (blockContent) {
+        const targetNote = Object.values(this.notes).find(n => n.title.toLowerCase() === noteTitle.trim().toLowerCase());
+        if (targetNote) {
+          const blockContent = targetNote.getBlockContent(blockId.trim());
+         if (blockContent) {
             const embedTitle = displayText || noteTitle; // Use display text if provided
             return `<div class="embedded-block">${marked.parse(blockContent)}<div class="embedded-block-source">From: <span class="wikilink" data-link="${noteTitle}">${embedTitle}</span></div></div>`;
         }
@@ -729,10 +760,10 @@ async createDefaultNotes() {
 
         let codeBlockIndex = 0;
 
-        const notesMap = Object.values(this.notes).reduce((acc, note) => {
-            acc[note.title.toLowerCase()] = true;
-            return acc;
-        }, {});
+        const titleToIdMap = Object.values(this.notes).reduce((acc, note) => {
+        acc[note.title.toLowerCase()] = note.id;
+        return acc;
+    }, {});
 
                 const finalHtmlParts = parts.map((part) => {
             if (part.startsWith('```python')) {
@@ -755,7 +786,7 @@ async createDefaultNotes() {
                 return html;
             } else {
                 
-                return this.md.render(part, { notesMap });
+                return this.md.render(part, { notes: this.notes });
             }
         });
 
@@ -784,6 +815,52 @@ async createDefaultNotes() {
         this.bindPreviewEvents(paneEl, note);
     }
     
+       async handleNoteRename(renamedNote, oldTitle) {
+        // Find all notes that contain a link to the note that was just renamed
+        const affectedNotes = [];
+        const linkId = renamedNote.id;
+
+        for (const note of Object.values(this.notes)) {
+            if (note.id === linkId) continue;
+
+            // Check if the note's content includes a wikilink to the renamed note's ID
+            if (note.content.includes(`[[${linkId}|`)) {
+                affectedNotes.push(note);
+            }
+        }
+
+        if (affectedNotes.length === 0) {
+            return;
+        }
+
+        // Prompt for confirmation
+        const result = await this._showConfirmationModal({
+            title: 'Update Link Display Text?',
+            message: `You renamed "${oldTitle}" to "${renamedNote.title}". <br><br>Update the display text for ${affectedNotes.length} link(s) in other notes?`,
+            confirmText: 'Update Links',
+            cancelText: 'Leave Them'
+        });
+
+        if (!result.confirmed) {
+            return;
+        }
+        
+        // Update the affected notes
+        const newTitle = renamedNote.title;
+        const regex = new RegExp(`\\[\\[(${linkId})\\|([^\\]]+)\\]\\]`, 'g');
+
+        affectedNotes.forEach(note => {
+            const newContent = note.content.replace(regex, `[[${linkId}|${newTitle}]]`);
+            note.update(newContent, true);
+        });
+
+        this.saveNotes();
+        this.renderAllPanes(); // This will refresh all editors with the new display format
+        
+        console.log(`Updated display text in ${affectedNotes.length} notes.`);
+    }
+
+
     base64ToBlob(base64, contentType = 'image/png', sliceSize = 512) {
         const byteCharacters = atob(base64);
         const byteArrays = [];
@@ -941,12 +1018,16 @@ async createDefaultNotes() {
         paneEl.querySelectorAll('.wikilink').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const linkText = link.dataset.link;
-                const targetNote = Object.values(this.notes).find(n => n.title.toLowerCase() === linkText.toLowerCase());
-                if (targetNote) {
-                    this.openNote(targetNote.id);
+                const noteId = link.dataset.link; // This is now the note's ID
+                
+                if (this.notes[noteId]) {
+                    // Direct lookup, no searching needed.
+                    this.openNote(noteId);
                 } else {
-                    this.createNoteWithTitle(linkText);
+                    // The link is broken because the ID is invalid.
+                    // We could potentially offer to create a new note, but for now,
+                    // doing nothing on a broken link click is safe.
+                    console.warn(`Clicked a broken link to a non-existent note ID: ${noteId}`);
                 }
             });
         });
@@ -1386,68 +1467,70 @@ renderNoteList() {
         if (menu) menu.remove();
     }
 
-    handleAutocomplete(textarea, autocompleteManager, onSelectCallback) {
-    const cursorPos = textarea.selectionStart;
-    const textBeforeCursor = textarea.value.substring(0, cursorPos);
+        handleAutocomplete(textarea, autocompleteManager, onSelectCallback) {
+        const cursorPos = textarea.selectionStart;
+        const textBeforeCursor = textarea.value.substring(0, cursorPos);
 
-    // This updated regex will only match when the cursor is inside the link target part,
-    // before any '|' or ']]'
-    const linkMatch = textBeforeCursor.match(/\[\[([^\]|]*)$/);
+        // Match [[text]] format (no pipe since we're hiding IDs)
+        const linkMatch = textBeforeCursor.match(/\[\[([^\]]*)$/);
 
-    if (linkMatch) {
-        // The query is the text immediately following '[['
-        const query = linkMatch[1];
+        if (linkMatch) {
+            const query = linkMatch[1];
+            
+            autocompleteManager.show(textarea, query, (selectedMatch) => {
+                onSelectCallback(selectedMatch, linkMatch);
+            });
+        } else {
+            autocompleteManager.hide();
+        }
+    }
+
+                afterAutocomplete(textarea, selectedMatch, originalLinkMatch, onComplete) {
+        const cursorPos = textarea.selectionStart;
+        const queryToReplace = originalLinkMatch[0];
+        const startOfReplace = cursorPos - originalLinkMatch[1].length - 2; // Position before the `[[`
         
-        autocompleteManager.show(textarea, query, (selectedMatch) => {
-            onSelectCallback(selectedMatch, linkMatch);
-        });
-    } else {
-        // If the regex doesn't match (e.g., after a '|'), hide the autocomplete
-        autocompleteManager.hide();
-    }
-}
+        const textBefore = textarea.value.substring(0, startOfReplace);
+        const textAfter = textarea.value.substring(cursorPos);
 
-    afterAutocomplete(textarea, selectedMatch, originalLinkMatch, onComplete) {
-    const cursorPos = textarea.selectionStart;
-    const queryToReplace = originalLinkMatch[0];
-    const startOfReplace = cursorPos - queryToReplace.length;
-    
-    const textBefore = textarea.value.substring(0, startOfReplace);
-    const textAfter = textarea.value.substring(cursorPos);
+        let noteId;
+        const noteTitle = selectedMatch.title;
 
-    if (selectedMatch.type === 'create') {
-        // Create the new note if it doesn't exist
-        const note = new Note(selectedMatch.title);
-        this.notes[note.id] = note;
-        this.graphManager.updateNotes(this.notes);
-        this.saveNotes();
-        this.renderNoteList();
+        if (selectedMatch.type === 'create') {
+            const note = new Note(noteTitle);
+            this.notes[note.id] = note;
+            noteId = note.id;
+            
+            this.graphManager.updateNotes(this.notes);
+            this.saveNotes();
+            this.renderNoteList();
+        } else {
+            noteId = selectedMatch.id;
+        }
+
+        if (!noteId) {
+            console.error("Could not find or create an ID for the link. Aborting.");
+            return;
+        }
+        
+        // Use display format in the editor: [[title]] instead of [[id|title]]
+        const replacementText = `[[${noteTitle}]]`;
+        
+        textarea.value = textBefore + replacementText + textAfter;
+        
+        // Move cursor to end of inserted link
+        const newCursorPos = startOfReplace + replacementText.length;
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+        
+        // Trigger input event for preview update
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        
+        if (onComplete) {
+            onComplete();
+        }
+        
+        textarea.focus();
     }
-    
-    let replacementText;
-    
-    // Check if we were typing in the display text part (after |)
-    if (originalLinkMatch[3] !== undefined) {
-        // We were typing display text, keep the target and replace display text
-        const target = originalLinkMatch[1];
-        replacementText = `[[${target}|${selectedMatch.title}]]`;
-    } else {
-        // We were typing the target, create a simple wikilink
-        replacementText = `[[${selectedMatch.title}]]`;
-    }
-    
-    textarea.value = textBefore + replacementText + textAfter;
-    
-    // Set the cursor position to the end of the new link
-    const newCursorPos = startOfReplace + replacementText.length;
-    textarea.setSelectionRange(newCursorPos, newCursorPos);
-    
-    if (onComplete) {
-        onComplete();
-    }
-    
-    textarea.focus();
-}
 
     searchNotes(query) {
         const noteList = document.getElementById('noteList');
@@ -1663,6 +1746,37 @@ renderNoteList() {
         this.saveSettings(); 
         this.setupTheme(); 
     }
+
+   /**
+     * Convert internal format [[id|title]] to display format [[title]] for editor
+     */
+    convertToDisplayFormat(content) {
+        return content.replace(/\[\[([^|\]]+)\|([^\]]+)\]\]/g, '[[$2]]');
+    }
+
+    /**
+     * Convert display format [[title]] back to internal format [[id|title]]
+     * This is called when saving content from the editor
+     */
+    convertToInternalFormat(content) {
+        const titleToIdMap = Object.values(this.notes).reduce((acc, note) => {
+            acc[note.title.toLowerCase()] = note.id;
+            return acc;
+        }, {});
+
+        // Replace [[title]] with [[id|title]] where possible
+        return content.replace(/\[\[([^\]|]+)\]\]/g, (match, title) => {
+            const trimmedTitle = title.trim();
+            const noteId = titleToIdMap[trimmedTitle.toLowerCase()];
+            
+            if (noteId) {
+                return `[[${noteId}|${trimmedTitle}]]`;
+            }
+            // Return unchanged if note doesn't exist (will be handled by autocomplete)
+            return match;
+        });
+    }
+
 
     showWelcomeModal() {
         const hasSeenWelcome = storage.get('pkm_seen_welcome', false);
