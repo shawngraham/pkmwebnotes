@@ -34,7 +34,12 @@ class PKMApp {
         this.init();
     }
     
-    
+     escapeRegExp(string) {
+        // $& means the whole matched string
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+
         setupMarkdownParser() {
     const wikilinkPlugin = (md) => {
         // This regex looks for an ID and display text separated by a pipe
@@ -818,48 +823,65 @@ async createDefaultNotes() {
     }
     
        async handleNoteRename(renamedNote, oldTitle) {
-        // Find all notes that contain a link to the note that was just renamed
-        const affectedNotes = [];
         const linkId = renamedNote.id;
+        const newTitle = renamedNote.title;
 
-        for (const note of Object.values(this.notes)) {
-            if (note.id === linkId) continue;
+        // --- PART 1: Update standard wikilinks (Optional for user) ---
+        const notesWithLinks = Object.values(this.notes).filter(note =>
+            note.id !== linkId && note.content.includes(`[[${linkId}|`)
+        );
 
-            // Check if the note's content includes a wikilink to the renamed note's ID
-            if (note.content.includes(`[[${linkId}|`)) {
-                affectedNotes.push(note);
+        if (notesWithLinks.length > 0) {
+            const result = await this._showConfirmationModal({
+                title: 'Update Link Display Text?',
+                message: `You renamed "${oldTitle}" to "${newTitle}". <br><br>Update the display text for ${notesWithLinks.length} link(s) in other notes where it matches the old title?`,
+                confirmText: 'Update Links',
+                cancelText: 'Leave Them'
+            });
+
+            if (result.confirmed) {
+                const wikilinkRegex = new RegExp(`\\[\\[(${linkId})\\|([^\\]]+)\\]\\]`, 'g');
+                notesWithLinks.forEach(note => {
+                    const newContent = note.content.replace(wikilinkRegex, (match, id, displayText) => {
+                        // Only replace links where the display text was the old title
+                        if (displayText.trim().toLowerCase() === oldTitle.trim().toLowerCase()) {
+                            return `[[${id}|${newTitle}]]`;
+                        }
+                        return match; // Leave other display texts (e.g., custom aliases) alone
+                    });
+                    if (newContent !== note.content) {
+                        note.update(newContent, true);
+                    }
+                });
             }
         }
 
-        if (affectedNotes.length === 0) {
-            return;
+        // --- PART 2: Update block embeds (Automatic and necessary) ---
+        const notesWithEmbeds = [];
+        // Create a safe regex to find embeds using the old title
+        const embedSearchRegex = new RegExp(`!\\[\\[${this.escapeRegExp(oldTitle)}#\\^`, 'i');
+
+        for (const note of Object.values(this.notes)) {
+            if (note.id !== linkId && embedSearchRegex.test(note.content)) {
+                notesWithEmbeds.push(note);
+            }
         }
 
-        // Prompt for confirmation
-        const result = await this._showConfirmationModal({
-            title: 'Update Link Display Text?',
-            message: `You renamed "${oldTitle}" to "${renamedNote.title}". <br><br>Update the display text for ${affectedNotes.length} link(s) in other notes?`,
-            confirmText: 'Update Links',
-            cancelText: 'Leave Them'
-        });
+        if (notesWithEmbeds.length > 0) {
+            // This regex finds embeds with the old title and replaces only the title part
+            const embedUpdateRegex = new RegExp(`(!\\[\\[)(${this.escapeRegExp(oldTitle)})(#\\^.*?\\]\\])`, 'gi');
 
-        if (!result.confirmed) {
-            return;
+            notesWithEmbeds.forEach(note => {
+                const newEmbedContent = note.content.replace(embedUpdateRegex, `$1${newTitle}$3`);
+                note.update(newEmbedContent, true);
+            });
         }
-        
-        // Update the affected notes
-        const newTitle = renamedNote.title;
-        const regex = new RegExp(`\\[\\[(${linkId})\\|([^\\]]+)\\]\\]`, 'g');
 
-        affectedNotes.forEach(note => {
-            const newContent = note.content.replace(regex, `[[${linkId}|${newTitle}]]`);
-            note.update(newContent, true);
-        });
-
+        // --- PART 3: Save and Re-render ---
+        // Save and refresh the UI to show all changes
         this.saveNotes();
-        this.renderAllPanes(); // This will refresh all editors with the new display format
-        
-        console.log(`Updated display text in ${affectedNotes.length} notes.`);
+        this.renderAllPanes(); 
+        this.updateRightSidebar();
     }
 
 
