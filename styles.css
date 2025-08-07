@@ -123,6 +123,45 @@ body {
     text-decoration: underline;
 }
 
+/* --- Table Styles for Preview Pane --- */
+
+.preview-content table {
+    width: 100%;
+    border-collapse: collapse; /* Removes space between cell borders */
+    margin-bottom: 16px; /* Space below the table */
+    font-size: 14px;
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    border-radius: 6px;
+    overflow: hidden; /* Ensures border-radius is respected by children */
+}
+
+[data-theme="dark"] .preview-content table {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.preview-content th,
+.preview-content td {
+    border: 1px solid var(--border);
+    padding: 10px 14px; /* More comfortable padding */
+    text-align: left;
+}
+
+.preview-content th {
+    background-color: var(--surface); /* Use the surface color for headers */
+    font-weight: 600;
+    color: var(--text);
+}
+
+/* Add a subtle background to every other row for readability */
+.preview-content tr:nth-child(even) {
+    background-color: var(--surface);
+}
+
+.preview-content tr:hover {
+    background-color: var(--bg-hover);
+}
+
 /* Pyodide Status Indicator */
 .pyodide-status {
     display: flex;

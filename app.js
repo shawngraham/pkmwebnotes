@@ -28,41 +28,85 @@ class PKMApp {
         
         this.graphManager.onNodeClick = (noteId) => this.openNote(noteId);
         this.resizablePanes = null;
+        this.md = null;
 
-        this.setupMarked();
+        this.setupMarkdownParser(); 
         this.init();
     }
     
     
-    setupMarked() {
-    const wikilinkExtension = {
-        name: 'wikilink',
-        level: 'inline',
-        start: (src) => src.indexOf('[['),
-        tokenizer(src) {
-            // Updated regex to capture both link target and optional display text
-            const rule = /^\[\[([^\]|]+)(\|([^\]]+))?\]\]/;
-            const match = rule.exec(src);
-            if (match) {
-                return {
-                    type: 'wikilink',
-                    raw: match[0],           // Full match: [[Page Title|Display Text]]
-                    target: match[1].trim(), // The actual page to link to
-                    text: match[3] ? match[3].trim() : match[1].trim(), // Display text or fallback to target
-                };
+        setupMarkdownParser() {
+    // 1. WIKILINK PLUGIN: Define the custom rule for markdown-it
+    const wikilinkPlugin = (md) => {
+        const wikilinkRegex = /\[\[([^\]|]+)(\|([^\]]+))?\]\]/;
+
+        function wikilinkTokenizer(state, silent) {
+            const match = wikilinkRegex.exec(state.src.slice(state.pos));
+            if (!match) { return false; }
+
+            const fullMatch = match[0];
+            const target = match[1].trim();
+            const text = match[3] ? match[3].trim() : target;
+
+            if (!silent) {
+                const token = state.push('wikilink_open', 'span', 1);
+                token.attrs = [['class', 'wikilink'], ['data-link', target], ['title', target]];
+                
+                const textToken = state.push('text', '', 0);
+                textToken.content = text;
+                
+                state.push('wikilink_close', 'span', -1);
             }
-        },
-        renderer(token) {
-            const target = token.target;
-            const displayText = token.text;
-            const exists = this.parser.options.notesMap[target.toLowerCase()];
-            const className = exists ? 'wikilink' : 'wikilink broken';
-            // Use target for the data-link attribute (for navigation) and displayText for what's shown
-            return `<span class="${className}" data-link="${target}" title="${target}">${displayText}</span>`;
+
+            state.pos += fullMatch.length;
+            return true;
         }
+
+        md.inline.ruler.before('link', 'wikilink', wikilinkTokenizer);
+
+        // Add a renderer rule to handle the 'broken' class
+        md.renderer.rules.wikilink_open = (tokens, idx, options, env, self) => {
+            const token = tokens[idx];
+            const target = token.attrGet('data-link');
+            
+            // =======================================================
+            // V V V V V V V V V  THE BUG FIX IS HERE V V V V V V V V V
+            // =======================================================
+            // We must get notesMap from `env`, not `options`.
+            const notesMap = env.notesMap || {}; 
+            // =======================================================
+
+            const exists = notesMap[target.toLowerCase()];
+            
+            if (!exists) {
+                token.attrJoin('class', 'broken');
+            }
+
+            return self.renderToken(tokens, idx, options);
+        };
     };
 
-    marked.use({ extensions: [wikilinkExtension] });
+    // Initialize markdown-it and set the highlight option correctly
+    const mdInstance = window.markdownit({
+        html: true,
+        linkify: true,
+        typographer: true,
+        tables: true,
+    }).use(wikilinkPlugin);
+
+    mdInstance.options.highlight = function (str, lang) {
+        if (lang && hljs.getLanguage(lang)) {
+            try {
+                return '<pre class="hljs"><code>' +
+                       hljs.highlight(str, { language: lang, ignoreIllegals: true }).value +
+                       '</code></pre>';
+            } catch (__) {}
+        }
+        return '<pre class="hljs"><code>' + mdInstance.utils.escapeHtml(str) + '</code></pre>';
+    };
+
+    // Assign the fully configured instance to the class property.
+    this.md = mdInstance;
 }
     
     bindPyodideStatus() {
@@ -690,7 +734,7 @@ async createDefaultNotes() {
             return acc;
         }, {});
 
-        const finalHtmlParts = parts.map((part) => {
+                const finalHtmlParts = parts.map((part) => {
             if (part.startsWith('```python')) {
                 const code = part.replace(/^```python\n/, '').replace(/\n```$/, '');
                 const uniqueId = `code-${note.id}-${codeBlockIndex}`;
@@ -698,6 +742,7 @@ async createDefaultNotes() {
                 const noteOutputs = this.codeBlockOutputs.get(note.id) || new Map();
                 const storedOutput = noteOutputs.get(codeBlockIndex) || '';
                 
+                // This logic is mostly unchanged, but let's be explicit
                 const html = `<div class="code-container" id="${uniqueId}">
                         <div class="code-header">
                             <span>PYTHON</span>
@@ -709,16 +754,32 @@ async createDefaultNotes() {
                 codeBlockIndex++;
                 return html;
             } else {
-                // The custom marked extension now handles wikilinks correctly.
-                return marked.parse(part, { notesMap });
+                
+                return this.md.render(part, { notesMap });
             }
         });
 
-        previewContentEl.innerHTML = finalHtmlParts.join('');
-        
-        previewContentEl.querySelectorAll('pre code:not(.language-python)').forEach(block => {
-            hljs.highlightBlock(block);
+        // First, join all the HTML parts together (python blocks + rendered markdown)
+        const dirtyHtml = finalHtmlParts.join('');
+
+                // Add a check to ensure DOMPurify exists before using it
+        if (!window.DOMPurify) {
+            console.error("DOMPurify has not loaded. Cannot sanitize HTML.");
+            // To prevent inserting potentially unsafe HTML, we can stop here
+            // or insert a safe error message.
+            previewContentEl.textContent = 'Error: Preview renderer not loaded yet, is not available.';
+            return; // Exit the function early
+        }
+
+        // Second, sanitize the combined HTML with DOMPurify
+        const cleanHtml = window.DOMPurify.sanitize(dirtyHtml, {
+            // Allow classes for wikilinks, code blocks, etc.
+            // This is important for your styling to work!
+            ADD_CLASSES: ['wikilink', 'broken', 'embedded-block', 'embedded-block-source', 'code-container', 'code-header', 'run-btn', 'code-output', 'language-python', 'output-error', 'spinner', 'hljs']
         });
+        
+        // Finally, set the innerHTML with the sanitized version
+        previewContentEl.innerHTML = cleanHtml;
         
         this.bindPreviewEvents(paneEl, note);
     }
