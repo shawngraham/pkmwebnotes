@@ -732,6 +732,7 @@ async createDefaultNotes() {
         this.saveNotes();
         this.backlinksManager.updateNotes(this.notes);
         this.graphManager.updateNotes(this.notes);
+        this.renderNoteList();
         this.updateRightSidebar();
     }
 

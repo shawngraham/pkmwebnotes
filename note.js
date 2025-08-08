@@ -99,12 +99,17 @@ tags: []
     }
 
     getPreview() {
+        // This new regex correctly handles both [[Title]] and [[id|Title]] formats,
+        // extracting only the human-readable title.
+        const wikilinkRegex = /\[\[(?:[^|\]]+\|)?([^\]]+)\]\]/g;
+
         return this.getContentWithoutMetadata()
-            .replace(/^#+\s*/gm, '') // Remove markdown headers
-            .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold
-            .replace(/\*(.*?)\*/g, '$1') // Remove italic
-            .replace(/\[\[(.*?)\]\]/g, '$1') // Remove wiki links
-            .replace(/\^([a-zA-Z0-9-]+)/g, '') // Remove block IDs
+            .replace(/^#+\s*/gm, '')             // Remove markdown headers
+            .replace(/\*\*(.*?)\*\*/g, '$1')     // Remove bold
+            .replace(/\*(.*?)\*/g, '$1')         // Remove italic
+            .replace(wikilinkRegex, '$1')        // Properly remove wiki links, leaving only the title
+            .replace(/\^([a-zA-Z0-9-]+)/g, '')   // Remove block IDs
+            .trim()                              // Remove leading/trailing whitespace
             .substring(0, 100);
     }
 
