@@ -11,7 +11,7 @@ This is your personal knowledge management system in the browser.
 ## Key Features
 
 - **Markdown Editor**: Write notes using simple markdown syntax.
-- **Wikilinks**: Connect your ideas by creating links between notes with [[Note Title]].
+- **Wikilinks**: Connect your ideas by creating links between notes using square brackets and the note name
 - **Backlinks**: See which notes link to your current note in the right sidebar.
 - **Graph View**: Visualize the connections between your notes.
 - **Python Execution**: Run Python code directly within your notes! See the [[Python in Notes]] note for details.
@@ -20,13 +20,14 @@ This is your personal knowledge management system in the browser.
 
 1.  **Create a new note**: Click the "+ New Note" button.
 2.  **Start writing**: Use the editor in the central pane.
-3.  **Create a link**: Type [[ and start typing a note title. An autocomplete will appear. Try linking to [[Python in Notes]].`;
+3.  **Create a link**: Type ```[[``` and start typing a note title. An autocomplete will appear.
+
 
 ## A few more details
 
             
 ### Note Management
-                <ul>
+                
 + Create and edit notes with markdown support
 + Notes automatically save as you type
 + Real-time preview with syntax highlighting
@@ -35,12 +36,19 @@ This is your personal knowledge management system in the browser.
                 
 ### Linking System
 
-+ Create wiki-style links between notes using <code>[[Note Title]]</code> syntax
+
 + Autocomplete suggestions when typing links
 + Backlinks panel shows which notes link to the current note
 + Broken links are highlighted differently from valid links
-+ <b>WARNING</b>: If you change a note name, existing wikilinks to that note will break
++ If you rename a note, wikilinks will update (as well as note names in the note list, and in the backlinks panel. There might be a delay but you can always force a refresh with ctrl+r)
++ You can alias a wikilink with 
+```
+[[note title/display text]]
+```
 
++ Links in the editor can be clicked on; red links mean the target note hasn't been created yet. Click on it and a new note with that name is created.
+
+> If you're familiar with markdown in note making apps like this, you'll wonder why the forward-slash and not the pipe character. This is because of the way the app keeps track of note name changes; every note has a unique id under-the-hood using unique-id|note title. So the alias in the user interface uses the codemirror library's ability to apply 'decorators' to the link so that we can make our links as we want and display them as we not while not losing track!
                 
 ### Multi-Pane Interface
                

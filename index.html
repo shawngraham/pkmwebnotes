@@ -4,15 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PKM Notes</title>
-    <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
+  <script type="module" crossorigin src="/assets/index-BwHgCxrC.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-V23kHn8m.css">
 </head>
 <body>
     <div class="app">
         <header class="header">
             <div class="logo">📝 PKM WebNotes</div>
+            
+            
+            <div class="navigation-controls">
+                <button class="btn nav-btn" id="backBtn" title="Go Back" disabled>
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <button class="btn nav-btn" id="forwardBtn" title="Go Forward" disabled>
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+            </div>
+            
+
             <input type="text" class="search-input" placeholder="Search notes..." id="searchInput">
+            
             <div class="header-actions">
                 <!-- Pyodide Status Indicator -->
                 <div class="pyodide-status" id="pyodideStatus" title="Python environment status">
@@ -30,13 +44,11 @@
             <p align="right">A home cooked app by <a href="https://shawngraham.github.io">S.M. Graham</a></p>
             </div>
         </header>
-
         <main class="main">
             <aside class="sidebar">
                 <div class="sidebar-header" id="noteListHeader">All Notes</div>
                 <div class="note-list" id="noteList"></div>
             </aside>
-
             <div class="editor-area">
                 <div class="editor-panes-container" id="editorPanesContainer">
                     <div class="empty-state">
@@ -45,7 +57,6 @@
                     </div>
                 </div>
             </div>
-
             <aside class="right-sidebar" id="rightSidebar">
                 <div class="right-sidebar-content">
                     <div class="empty-sidebar">
@@ -56,14 +67,15 @@
         </main>
         <div class="width-tooltip" id="widthTooltip"></div>
     </div>
-
     <input type="file" id="fileInput" multiple accept=".md,.txt" class="hidden">
+    
+    <!-- External dependencies loaded via CDN -->
     <script defer src="https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js"></script>
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.1/markdown-it.min.js"></script>
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.5/purify.min.js"></script>
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
     
-    <script type="module" src="app.js"></script>
+    <!-- Main application entry point -->
 </body>
 </html>
