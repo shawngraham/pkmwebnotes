@@ -576,6 +576,55 @@ class PKMApp {
         this.updateRightSidebar();
     }
 
+    /**
+     * Moves a specific note to a new folder by updating its 'folder' property.
+     * @param {string} noteId - The ID of the note to move.
+     */
+    moveNote(noteId) {
+    const note = this.notes[noteId];
+    if (!note) return;
+
+    const currentFolder = note.folder || 'root';
+    const newFolder = prompt(`Move "${note.title}" to which folder?`, currentFolder);
+
+    // Exit if the user cancelled or didn't change the folder
+    if (newFolder === null || newFolder.trim() === currentFolder) {
+        return;
+    }
+
+    // Update the folder property, using 'root' for empty input
+    note.folder = newFolder.trim() || 'root';
+    
+    // Manually update the modified timestamp to the current time
+    note.modified = Date.now(); 
+    
+    this.saveNotes();
+    this.renderNoteList();
+}
+
+    /**
+     * "Creates" a new folder by creating a new note within that folder path.
+     */
+    createFolder() {
+        const folderName = prompt("Enter new folder name (e.g., 'Projects/Web'):");
+        if (!folderName || folderName.trim().length === 0) {
+            return;
+        }
+        
+        // Create a new, untitled note
+        const note = new Note(`Untitled`);
+        // Assign it to the new folder path
+        note.folder = folderName.trim();
+        this.notes[note.id] = note;
+
+        // Update all app components
+        this.backlinksManager.updateNotes(this.notes);
+        this.graphManager.updateNotes(this.notes);
+        this.saveNotes();
+        this.renderNoteList();
+        this.openNote(note.id); // Open the new note for immediate editing
+    }
+
     _showConfirmationModal(options) {
         return new Promise((resolve) => {
             const { 
@@ -1195,7 +1244,7 @@ class PKMApp {
         });
     }
 
-    showContextMenu(event, context = {}) {
+        showContextMenu(event, context = {}) {
         this.hideContextMenu();
 
         const menu = document.createElement('div');
@@ -1208,13 +1257,30 @@ class PKMApp {
         switch (context.type) {
             case 'note':
                 const noteId = context.noteId;
+                // --- MODIFICATION START ---
+                const noteTitle = this.notes[noteId] ? `"${this.notes[noteId].title}"` : "Note";
                 menuItems = `
+                    <div class="context-menu-title">Actions for ${noteTitle}</div>
                     <button class="context-menu-item" data-action="open" data-note-id="${noteId}">📂 Open</button>
+                    <button class="context-menu-item" data-action="move-note" data-note-id="${noteId}">↦ Move...</button>
                     <div class="context-menu-separator"></div>
                     <button class="context-menu-item" data-action="delete" data-note-id="${noteId}">🗑️ Delete Note</button>
                 `;
+
                 break;
-            default:
+            case 'sidebar': // This case is triggered by the existing event listener in init()
+
+                 menuItems = `
+                    <button class="context-menu-item" data-action="new-note">📝 New Note</button>
+                    <button class="context-menu-item" data-action="new-folder">📁 New Folder...</button>
+                    <div class="context-menu-separator"></div>
+                    <div class="context-menu-title">Sort Notes By</div>
+                    <button class="context-menu-item" data-sort="alphabetical">${check('alphabetical')}Alphabetical</button>
+                    <button class="context-menu-item" data-sort="modified-desc">${check('modified-desc')}Most Recent</button>
+                    <button class="context-menu-item" data-sort="modified-asc">${check('modified-asc')}Oldest</button>
+                `;
+                break;
+            default: // Fallback for header and other areas
                 menuItems = `
                     <div class="context-menu-title">Sort Notes By</div>
                     <button class="context-menu-item" data-sort="alphabetical">${check('alphabetical')}Alphabetical</button>
@@ -1241,9 +1307,12 @@ class PKMApp {
 
             switch (action) {
                 case 'new-note': this.createNote(); break;
+                case 'new-folder': this.createFolder(); break;
                 case 'open': this.openNote(noteId); break;
+                case 'move-note': this.moveNote(noteId); break;
                 case 'delete': this.deleteNote(noteId, e); break;
             }
+
             this.hideContextMenu();
         });
     }

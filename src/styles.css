@@ -302,11 +302,6 @@ body {
     margin: 0 auto;
 }
 
-/*
-*
-* --- END OF CORRECTED SECTION ---
-*
-*/
 
 /* Preview Content & Table Styles */
 .preview-content > *:first-child { margin-top: 0; }
@@ -319,6 +314,8 @@ body {
 .preview-content th, .preview-content td { border: 1px solid var(--border); padding: 10px 14px; text-align: left; }
 .preview-content th { background-color: var(--surface); font-weight: 600; }
 .preview-content tr:nth-child(even) { background-color: var(--surface); }
+.preview-content tbody tr:nth-child(odd) { background-color: var(--bg-hover);
+}
 
 /* Wiki Links */
 .wikilink { color: var(--primary); text-decoration: none; border-bottom: 1px dotted var(--primary); cursor: pointer; }
