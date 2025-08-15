@@ -23,4 +23,8 @@ tags: [welcome, getting-started]
 }
 ```
 
-- Use GH-Pages or Netlify Drop or another webhosting service to push it online (no builds, no Jekyll, etc etc!)
+- Use [Netlify Drop](https://app.netlify.com/drop) to push it online (no builds, no Jekyll, etc etc!). Other services might work too. 
+
+# Develop
+
+The source code is in the repo under the `source` branch. You're welcome to develop how you like; attribution would be nice.
