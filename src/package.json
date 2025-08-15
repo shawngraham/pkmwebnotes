@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@milkdown/crepe": "^7.15.2"
+  }
+}
