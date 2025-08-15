@@ -6,14 +6,13 @@
     <title>PKM Notes</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
-  <script type="module" crossorigin src="/assets/index-CAmwJkW8.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-V23kHn8m.css">
+  <script type="module" crossorigin src="/assets/index-BGphVD9D.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CRN9DRrn.css">
 </head>
 <body>
     <div class="app">
         <header class="header">
             <div class="logo">📝 PKM WebNotes</div>
-            
             
             <div class="navigation-controls">
                 <button class="btn nav-btn" id="backBtn" title="Go Back" disabled>
@@ -24,11 +23,9 @@
                 </button>
             </div>
             
-
             <input type="text" class="search-input" placeholder="Search notes..." id="searchInput">
             
             <div class="header-actions">
-                <!-- Pyodide Status Indicator -->
                 <div class="pyodide-status" id="pyodideStatus" title="Python environment status">
                     <span class="status-icon">🐍</span>
                     <span class="status-text">Loading...</span>
@@ -37,26 +34,29 @@
                 <button class="btn" id="importBtn">Import</button>
                 <button class="btn" id="exportBtn">Export</button>
                 <button class="btn btn-primary" id="newNoteBtn">+ New Note</button>
-                <button id="toggle-right-sidebar" class="btn" title="Toggle Sidebar">
-                    <i class="fas fa-columns"></i>
+                <button id="toggle-right-sidebar" class="btn" title="Toggle Info Sidebar">
+                    <!-- SUGGESTION: Changed icon from fa-columns to fa-info-circle for better clarity -->
+                    <i class="fas fa-info-circle"></i>
                 </button>
             
-            <p align="right">A home cooked app by <a href="https://shawngraham.github.io">S.M. Graham</a></p>
+                <div class="header-byline">
+                    A home cooked app by <a href="https://shawngraham.github.io" target="_blank" rel="noopener noreferrer">S.M. Graham</a>
+                </div>
             </div>
         </header>
+        
         <main class="main">
             <aside class="sidebar">
                 <div class="sidebar-header" id="noteListHeader">All Notes</div>
                 <div class="note-list" id="noteList"></div>
             </aside>
+            
             <div class="editor-area">
                 <div class="editor-panes-container" id="editorPanesContainer">
-                    <div class="empty-state">
-                        <h3>Welcome to PKM Notes</h3>
-                        <p>Select a note from the sidebar or create a new one to get started.</p>
-                    </div>
+                    <!-- The content of the editor is now fully managed by main.js -->
                 </div>
             </div>
+            
             <aside class="right-sidebar" id="rightSidebar">
                 <div class="right-sidebar-content">
                     <div class="empty-sidebar">
@@ -65,8 +65,9 @@
                 </div>
             </aside>
         </main>
-        <div class="width-tooltip" id="widthTooltip"></div>
     </div>
+    
+    <!-- This file input is correctly hidden and used for imports -->
     <input type="file" id="fileInput" multiple accept=".md,.txt" class="hidden">
     
     <!-- External dependencies loaded via CDN -->
