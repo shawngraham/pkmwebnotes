@@ -133,13 +133,6 @@ class PKMApp {
     const wikilinkRegex = /\[\[([^|\]\/]+)(?:\|([^\]|]+)(?:\|([^\]]+))?|\/([^\]|]+)(?:\|([^\]]+))?)?\]\]/;
 
     function wikilinkTokenizer(state, silent) {
-        if (state.delimiters) {
-            for (let i = 0; i < state.delimiters.length; i++) {
-                if (state.delimiters[i].marker === 0x60) {
-                    return false; 
-                }
-            }
-        }
         
         const match = wikilinkRegex.exec(state.src.slice(state.pos));
         if (!match) { return false; }
@@ -177,7 +170,7 @@ class PKMApp {
         }
 
         if (!silent) {
-            const token = state.push('wikilink_open', 'span', 1);
+            const token = state.push('wikilink_open', 'a', 1);
             const classes = ['wikilink'];
             if (decorator) {
                 classes.push(`wikilink-${decorator}`);
@@ -195,7 +188,7 @@ class PKMApp {
             const textToken = state.push('text', '', 0);
             textToken.content = text;
             
-            state.push('wikilink_close', 'span', -1);
+            state.push('wikilink_close', 'a', -1);
         }
         state.pos += fullMatch.length;
         return true;
@@ -207,6 +200,8 @@ class PKMApp {
         const token = tokens[idx];
         const linkRef = token.attrGet('data-link');
         const decorator = token.attrGet('data-decorator');
+
+        token.attrSet('href', '#');
         
         const notes = env.notes || {};
         const exists = notes[linkRef] || Object.values(notes).find(n => 
