@@ -1,6 +1,7 @@
 // src/wikilink-decorator.js
 import { ViewPlugin, Decoration, MatchDecorator } from "@codemirror/view";
 import { WidgetType } from "@codemirror/view";
+import { syntaxTree } from "@codemirror/language";
 
 class WikilinkWidget extends WidgetType {
     constructor(displayText, noteTitle, noteId, openNoteCallback, createNoteCallback, isAlias = false) {
@@ -54,25 +55,33 @@ class WikilinkWidget extends WidgetType {
 }
 
 export function wikilinkPlugin(notes, openNoteCallback, createNoteCallback) {
-    const titleToIdMap = Object.values(notes).reduce((acc, note) => {
-        acc[note.title.toLowerCase()] = note.id;
-        return acc;
-    }, {});
+    
 
     const decorator = new MatchDecorator({
         // Enhanced regex to support multiple wikilink formats:
         // 1. [[note.id|title]] - internal format (existing)
         // 2. [[title]] - simple format (existing) 
         // 3. [[target note/alias]] - new alias format
-        regexp: /\[\[([^|\]\/]+)(?:\|([^\]]+)|\/([^\]]+))?\]\]/g,
+        regexp: /\[\[([^|\]/]+)(?:\|([^\]]+)|\/([^\]]+))?\]\]/g,
         decoration: (match, view, pos) => {
+    const tree = syntaxTree(view.state);
+            // Check the node type at the start of the match.
+            // .type.name will be things like 'InlineCode', 'FencedCode', 'CodeBlock', etc.
+            if (tree.resolve(pos, 1).type.name.includes("Code")) {
+                return null; // We're in a code block, so do nothing.
+}
+    const titleToIdMap = Object.values(notes).reduce((acc, note) => {
+        acc[note.title.toLowerCase()] = note.id;
+        return acc;
+    }, {});
+
     // Don't decorate if cursor is within the wikilink being edited
     const cursor = view.state.selection.main.head;
     if (cursor >= pos && cursor <= pos + match[0].length) {
         return null; // Don't decorate if cursor is inside
     }
     
-    // Rest of your existing decoration logic...
+    
     const firstPart = match[1].trim();
     const pipePart = match[2] ? match[2].trim() : null;
     const slashPart = match[3] ? match[3].trim() : null;
