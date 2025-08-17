@@ -130,8 +130,7 @@ class PKMApp {
     initializeMarkdownParser() {
     const wikilinkPlugin = (md) => {
     // Enhanced regex to handle decorators with double pipe
-    const wikilinkRegex = /\[\[([^|\]\/]+)(?:\|([^\]|]+)(?:\|([^\]]+))?|\/([^\]|]+)(?:\|([^\]]+))?)?\]\]/;
-
+    const wikilinkRegex = /^\[\[([^|\]\/]+)(?:\|([^\]|]+)(?:\|([^\]]+))?|\/([^\]|]+)(?:\|([^\]]+))?)?\]\]/;
     function wikilinkTokenizer(state, silent) {
         
         const match = wikilinkRegex.exec(state.src.slice(state.pos));
