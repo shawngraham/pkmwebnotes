@@ -2,6 +2,7 @@
   "defaultNotes": {
     "root": ["welcome.md", "custom-deploy.md"],
     "python": ["python-in-notes.md", "python-examples.md"],
+    "r-code": ["r_capabilities_note.md"],
     "projects": {
       "work": ["project1.md", "project2.md"],
       "personal": ["ideas.md"]

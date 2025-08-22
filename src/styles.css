@@ -427,5 +427,118 @@ body {
 .nav-btn { padding: 8px 10px; }
 .nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 [data-theme="dark"] .embedded-block,
-[data-theme="dark"] .code-container {
-    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+[data-theme="dark"] .code-container {box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+
+/* In src/styles.css - Add to the end of the file */
+
+/* --- CODE OUTPUT ENHANCEMENTS --- */
+
+.code-output {
+    padding: 0;
+    font-family: 'SF Mono', Monaco, Inconsolata, monospace;
+    font-size: 13px;
+    background: var(--background);
+    border-top: 1px dashed var(--border);
+    min-height: 1.5em;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.output-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 12px;
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--border);
+}
+
+.execution-info {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.execution-number {
+    font-weight: bold;
+    margin-right: 4px;
+}
+
+.copy-output-btn {
+    padding: 3px 8px;
+    font-size: 11px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.copy-output-btn:hover {
+    background-color: var(--bg-hover);
+    border-color: var(--text-muted);
+    color: var(--text);
+}
+
+.output-label {
+    font-weight: 500;
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    padding: 8px 12px 0;
+}
+
+.output-text,
+.output-result {
+    padding: 8px 12px;
+    margin: 0;
+    background: none;
+}
+
+.output-error {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--error);
+    margin: 8px 12px;
+    border-radius: 4px;
+    padding: 8px;
+}
+
+.plot-container {
+    padding: 8px 12px;
+    text-align: center;  
+}
+
+.plot-container img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    display: block;
+    margin: 0 auto 8px auto;  
+}
+
+.plot-actions {
+    display: flex;
+    justify-content: center;  
+    gap: 8px;
+    margin-top: 8px;  
+}
+
+.plot-actions button {
+    padding: 4px 10px;
+    background: var(--surface);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    white-space: nowrap;  
+}
+
+.plot-actions button:hover {
+    background-color: var(--bg-hover);
+    border-color: var(--text-muted);
+    color: var(--text);
+}

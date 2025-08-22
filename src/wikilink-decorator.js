@@ -1,8 +1,10 @@
 // src/wikilink-decorator.js
-import { ViewPlugin, Decoration, MatchDecorator } from "@codemirror/view";
-import { WidgetType } from "@codemirror/view";
-import { syntaxTree } from "@codemirror/language";
 
+// CORRECTED: All required classes are now imported from the CDN
+import { ViewPlugin, Decoration, MatchDecorator, WidgetType } from "https://esm.sh/@codemirror/view";
+import { syntaxTree } from "https://esm.sh/@codemirror/language";
+
+// This class creates the custom HTML element that replaces the wikilink text
 class WikilinkWidget extends WidgetType {
     constructor(displayText, noteTitle, noteId, openNoteCallback, createNoteCallback, isAlias = false) {
         super();
@@ -16,8 +18,8 @@ class WikilinkWidget extends WidgetType {
 
     toDOM() {
         const span = document.createElement("span");
-        // Display the alias if it exists, otherwise the note title
-        span.textContent = `[[${this.displayText}]]`; 
+        // Display the alias text if it exists, otherwise the note title
+        span.textContent = this.displayText; 
         span.style.cursor = "pointer";
 
         if (this.noteId) {
@@ -25,23 +27,23 @@ class WikilinkWidget extends WidgetType {
             span.className = "cm-wikilink";
             if (this.isAlias) {
                 span.classList.add("cm-wikilink-alias");
-                span.title = `"${this.displayText}" → ${this.noteTitle}`;
+                span.title = `Alias: "${this.displayText}" → Links to: ${this.noteTitle}`;
             } else {
                 span.title = `Link to: ${this.noteTitle}`;
             }
-            span.addEventListener("click", (e) => {
+            span.addEventListener("mousedown", (e) => { // Use mousedown to feel more responsive
                 e.preventDefault();
                 this.openNoteCallback(this.noteId);
             });
         } else {
-            // This is a broken link
+            // This is a broken link (the note doesn't exist)
             span.className = "cm-wikilink cm-wikilink-broken";
             if (this.isAlias) {
-                span.title = `Create note: "${this.noteTitle}" (alias: "${this.displayText}")`;
+                span.title = `Create note: "${this.noteTitle}" (from alias: "${this.displayText}")`;
             } else {
                 span.title = `Create note: "${this.noteTitle}"`;
             }
-            span.addEventListener("click", (e) => {
+            span.addEventListener("mousedown", (e) => {
                 e.preventDefault();
                 this.createNoteCallback(this.noteTitle);
             });
@@ -49,77 +51,57 @@ class WikilinkWidget extends WidgetType {
         return span;
     }
 
+    // This ensures that clicking the widget doesn't interfere with editor selection
     ignoreEvent() {
-        return false;
+        return true;
     }
 }
 
 export function wikilinkPlugin(notes, openNoteCallback, createNoteCallback) {
-    
-
     const decorator = new MatchDecorator({
-        // Enhanced regex to support multiple wikilink formats:
-        // 1. [[note.id|title]] - internal format (existing)
-        // 2. [[title]] - simple format (existing) 
-        // 3. [[target note/alias]] - new alias format
+        // Regex to support: [[Title]], [[ID|Title]], [[Title/Alias]]
         regexp: /\[\[([^|\]/]+)(?:\|([^\]]+)|\/([^\]]+))?\]\]/g,
         decoration: (match, view, pos) => {
-    const tree = syntaxTree(view.state);
-            // Check the node type at the start of the match.
-            // .type.name will be things like 'InlineCode', 'FencedCode', 'CodeBlock', etc.
-            if (tree.resolve(pos, 1).type.name.includes("Code")) {
-                return null; // We're in a code block, so do nothing.
-}
-    const titleToIdMap = Object.values(notes).reduce((acc, note) => {
-        acc[note.title.toLowerCase()] = note.id;
-        return acc;
-    }, {});
+            // --- Safety Check: Do not decorate inside code blocks or comments ---
+            const tree = syntaxTree(view.state);
+            const node = tree.resolve(pos + 1, -1); // Check node at the start of the link content
+            if (node.type.name.includes("Code") || node.type.name.includes("Comment")) {
+                return null;
+            }
 
-    // Don't decorate if cursor is within the wikilink being edited
-    const cursor = view.state.selection.main.head;
-    if (cursor >= pos && cursor <= pos + match[0].length) {
-        return null; // Don't decorate if cursor is inside
-    }
-    
-    
-    const firstPart = match[1].trim();
-    const pipePart = match[2] ? match[2].trim() : null;
-    const slashPart = match[3] ? match[3].trim() : null;
-    
+            // --- Safety Check: Do not decorate if the cursor is inside the link ---
+            const cursor = view.state.selection.main.head;
+            if (cursor >= pos && cursor <= pos + match[0].length) {
+                return null;
+            }
+            
+            const titleToIdMap = Object.values(notes).reduce((acc, note) => {
+                acc[note.title.toLowerCase()] = note.id;
+                return acc;
+            }, {});
+
+            const firstPart = match[1].trim();
+            const pipePart = match[2] ? match[2].trim() : null;
+            const slashPart = match[3] ? match[3].trim() : null;
             
             let noteTitle, displayText, noteId, isAlias = false;
             
-            if (pipePart) {
-                // Format: [[note.id|title]] - internal format
+            if (pipePart) { // Format: [[note.id|title]]
                 noteId = firstPart;
-                noteTitle = pipePart;
-                displayText = pipePart;
-                // Verify the note actually exists
-                if (!notes[noteId]) {
-                    noteId = null;
-                }
-            } else if (slashPart) {
-                // Format: [[target note/alias]] - new alias format
+                noteTitle = displayText = pipePart;
+                if (!notes[noteId]) noteId = null; // Mark as broken if ID is invalid
+            } else if (slashPart) { // Format: [[target note/alias]]
                 noteTitle = firstPart;
                 displayText = slashPart;
                 noteId = titleToIdMap[noteTitle.toLowerCase()];
                 isAlias = true;
-            } else {
-                // Format: [[title]] - simple format
-                noteTitle = firstPart;
-                displayText = firstPart;
+            } else { // Format: [[title]]
+                noteTitle = displayText = firstPart;
                 noteId = titleToIdMap[noteTitle.toLowerCase()];
             }
 
             return Decoration.replace({
-                widget: new WikilinkWidget(
-                    displayText, 
-                    noteTitle, 
-                    noteId, 
-                    openNoteCallback, 
-                    createNoteCallback,
-                    isAlias
-                ),
+                widget: new WikilinkWidget(displayText, noteTitle, noteId, openNoteCallback, createNoteCallback, isAlias),
             });
         },
     });
@@ -128,7 +110,8 @@ export function wikilinkPlugin(notes, openNoteCallback, createNoteCallback) {
         (view) => ({
             decorations: decorator.createDeco(view),
             update(update) {
-                if (update.docChanged || update.viewportChanged) {
+                // This efficiently updates decorations when the document changes
+                if (update.docChanged || update.viewportChanged || update.selectionSet) {
                     this.decorations = decorator.updateDeco(update, this.decorations);
                 }
             },

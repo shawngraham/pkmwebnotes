@@ -35,7 +35,7 @@ export class PyodideManager {
                 indexURL: "https://cdn.jsdelivr.net/pyodide/v0.25.1/full/"
             });
             
-            console.log("🐍 Pyodide loaded. Installing packages...");
+            console.log("🐍 Pyodide loaded. Please wait while we install some packages...");
             this.updateStatus('loading', 'Installing packages...');
             
             await this.pyodide.loadPackage(["pandas", "numpy", "matplotlib", "micropip"]);

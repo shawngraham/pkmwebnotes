@@ -1,14 +1,15 @@
-// Import CodeMirror modules
-import { EditorState } from '@codemirror/state'
-import { EditorView, keymap } from '@codemirror/view'
-import { defaultKeymap } from '@codemirror/commands'
-import { markdown } from '@codemirror/lang-markdown'
-import { search, searchKeymap } from '@codemirror/search'
-import { autocompletion } from '@codemirror/autocomplete'
+// Import CodeMirror modules from a CDN
+import { EditorState } from 'https://esm.sh/@codemirror/state'
+import { EditorView, keymap } from 'https://esm.sh/@codemirror/view'
+import { defaultKeymap } from 'https://esm.sh/@codemirror/commands'
+import { markdown } from 'https://esm.sh/@codemirror/lang-markdown'
+import { search, searchKeymap } from 'https://esm.sh/@codemirror/search'
+import { autocompletion } from 'https://esm.sh/@codemirror/autocomplete'
 import { wikilinkPlugin } from './wikilink-decorator.js';
 
 
 import { PyodideManager } from './pyodideManager.js';
+import { WebRManager } from './webRManager.js'; 
 import { Note } from './note.js';
 import { BacklinksManager } from './backlinks.js';
 import { GraphManager } from './graph.js';
@@ -100,6 +101,10 @@ class PKMApp {
         this.graphManager = new GraphManager(this.notes);
         
         this.pyodideManager = new PyodideManager();
+        this.webRManager = new WebRManager();
+        this.bindPyodideStatus();
+        this.bindWebRStatus(); 
+  
         this.codeBlockOutputs = new Map();
         
         // --- A single editor instance for the tabbed view ---
@@ -245,6 +250,19 @@ class PKMApp {
         });
     }
 
+
+    bindWebRStatus() {
+        this.webRManager.setStatusCallback((status, message) => {
+            const statusEl = document.getElementById('webRStatus');
+            if (!statusEl) return;
+            const textEl = statusEl.querySelector('.status-text');
+            if (!textEl) return;
+            statusEl.className = 'webr-status';
+            statusEl.classList.add(status);
+            textEl.textContent = message;
+        });
+    }
+
     loadNotes() {
         const savedNotes = storage.get('pkm_notes', {});
         const notes = {};
@@ -274,8 +292,7 @@ class PKMApp {
         }
 
         this.setupTheme();
-        this.bindPyodideStatus();
-        this.bindGlobalEvents();
+       this.bindGlobalEvents();
         this.renderNoteList();
         this.loadInitialEditorState();
         this.updateRightSidebar();
@@ -836,9 +853,9 @@ class PKMApp {
     updatePanePreview(paneEl, note) {
         const previewContentEl = paneEl.querySelector('.preview-content');
         if (!previewContentEl) return;
-
+    
         let content = note.getContentWithoutMetadata();
-
+    
         content = content.replace(/!\[\[([^#\]|]+)(\|([^\]]+))?#\^([^\]]+)\]\]/g, (match, noteTitle, pipe, displayText, blockId) => {
             const targetNote = Object.values(this.notes).find(n => n.title.toLowerCase() === noteTitle.trim().toLowerCase());
             if (targetNote) {
@@ -852,22 +869,31 @@ class PKMApp {
             }
             return `<div class="broken-embed">Note "${noteTitle}" not found</div>`;
         });
-
-        const codeBlockRegex = /(```python\n[\s\S]*?\n```)/g;
+    
+        // UPDATED Regex to capture python, r, or R code blocks
+        const codeBlockRegex = /(```(?:python|r|R)\n[\s\S]*?\n```)/g;
         const parts = content.split(codeBlockRegex);
-        let codeBlockIndex = 0;
-
+        let codeBlockIndex = 0; // A single index for all code blocks in the note
+    
         const finalHtmlParts = parts.map((part) => {
-            if (part.startsWith('```python')) {
-                const code = part.replace(/^```python\n/, '').replace(/\n```$/, '');
+            const isPython = part.startsWith('```python');
+            const isR = part.startsWith('```r') || part.startsWith('```R');
+    
+            if (isPython || isR) {
+                const lang = isPython ? 'python' : 'r';
+                const langDisplay = isPython ? 'PYTHON' : 'R';
+                const runBtnClass = 'run-btn'; // We can use one class now
+    
+                const code = part.replace(/^```(?:python|r|R)\n/, '').replace(/\n```$/, '');
                 const uniqueId = `code-${note.id}-${codeBlockIndex}`;
                 const escapedCode = this.escapeHtml(code);
+                
                 const noteOutputs = this.codeBlockOutputs.get(note.id) || new Map();
                 const storedOutput = noteOutputs.get(codeBlockIndex) || '';
                 
-                const html = `<div class="code-container" id="${uniqueId}">
-                        <div class="code-header"><span>PYTHON</span><button class="run-btn">▶ Run</button></div>
-                        <pre><code class="language-python">${escapedCode}</code></pre>
+                const html = `<div class="code-container" id="${uniqueId}" data-lang="${lang}">
+                        <div class="code-header"><span>${langDisplay}</span><button class="${runBtnClass}">▶ Run</button></div>
+                        <pre><code class="language-${lang}">${escapedCode}</code></pre>
                         <div class="code-output">${storedOutput}</div>
                     </div>`;
                 codeBlockIndex++;
@@ -876,22 +902,23 @@ class PKMApp {
                 return this.md.render(part, { notes: this.notes });
             }
         });
-
+    
         const dirtyHtml = finalHtmlParts.join('');
-
+    
         if (!window.DOMPurify) {
             console.error("DOMPurify not loaded.");
             previewContentEl.textContent = 'Error: Preview renderer not loaded.';
             return;
         }
-
+    
         const cleanHtml = window.DOMPurify.sanitize(dirtyHtml, {
-            ADD_CLASSES: ['wikilink', 'broken', 'embedded-block', 'embedded-block-source', 'code-container', 'code-header', 'run-btn', 'code-output', 'language-python', 'output-error', 'spinner', 'hljs']
+            ADD_CLASSES: ['wikilink', 'broken', 'embedded-block', 'embedded-block-source', 'code-container', 'code-header', 'run-btn', 'code-output', 'language-python', 'language-r', 'output-error', 'spinner', 'hljs']
         });
         
         previewContentEl.innerHTML = cleanHtml;
         this.bindPreviewEvents(paneEl, note);
     }
+    
     
     async handleNoteRename(renamedNote, oldTitle) {
         const linkId = renamedNote.id;
@@ -972,7 +999,7 @@ class PKMApp {
             if (buttonElement) {
                 setTimeout(() => {
                     if (buttonElement.classList.contains('copy-output-btn')) {
-                         buttonElement.textContent = 'Copy Text';
+                         buttonElement.textContent = 'Copy';
                     } else if (buttonElement.classList.contains('copy-plot-btn')) {
                          buttonElement.textContent = 'Copy Image';
                     }
@@ -983,57 +1010,71 @@ class PKMApp {
 
     bindPreviewEvents(paneEl, note) {
         let codeBlockIndex = 0;
-        paneEl.querySelectorAll('.run-btn').forEach(button => {
+    
+        paneEl.querySelectorAll('.code-container').forEach(container => {
             const currentBlockIndex = codeBlockIndex++;
+            const lang = container.dataset.lang;
+            const button = container.querySelector('.run-btn');
+            
+            if (!button) return;
+
             const newButton = button.cloneNode(true);
             button.parentNode.replaceChild(newButton, button);
             
             newButton.addEventListener('click', async (e) => {
-                const container = e.target.closest('.code-container');
-                const codeElement = container.querySelector('code.language-python');
+                const codeElement = container.querySelector(`code.language-${lang}`);
                 const outputEl = container.querySelector('.code-output');
                 
                 if (!codeElement) {
                     outputEl.innerHTML = '<pre class="output-error">No code found</pre>';
                     return;
                 }
-
+    
                 const code = codeElement.textContent;
                 outputEl.innerHTML = '<div class="spinner">⏳ Executing...</div>';
                 newButton.disabled = true;
                 newButton.textContent = '⏳ Running...';
-
+    
                 try {
-                    const execResult = await this.pyodideManager.executeCode(code, note.id, currentBlockIndex);
-                    const formattedOutput = this.pyodideManager.formatOutput(execResult.result, execResult.stdout, execResult.executionNumber, execResult.plots);
-                    outputEl.innerHTML = formattedOutput.html;
-
+                    let formattedOutput;
                     const noteOutputs = this.codeBlockOutputs.get(note.id) || new Map();
-                    noteOutputs.set(currentBlockIndex, formattedOutput.html);
-                    this.codeBlockOutputs.set(note.id, noteOutputs);
-
-                    outputEl.addEventListener('click', async (event) => {
-                        const target = event.target;
-                        if (target.matches('.copy-output-btn')) {
-                            this.copyTextToClipboard(formattedOutput.rawText || '', target);
-                        } else if (target.matches('.copy-plot-btn')) {
-                            const base64 = target.dataset.plotBase64;
-                            try {
-                                const blob = this.base64ToBlob(base64);
-                                await navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
-                                target.textContent = 'Copied!';
-                                setTimeout(() => { target.textContent = 'Copy Image'; }, 2000);
-                            } catch (err) {
-                                console.error('Failed to copy image:', err);
-                                target.textContent = 'Error!';
+    
+                    if (lang === 'python') {
+                        const execResult = await this.pyodideManager.executeCode(code, note.id, currentBlockIndex);
+                        formattedOutput = this.pyodideManager.formatOutput(execResult.result, execResult.stdout, execResult.executionNumber, execResult.plots);
+                    } else if (lang === 'r') {
+                        const execResult = await this.webRManager.executeCode(code);
+                        formattedOutput = this.webRManager.formatOutput(execResult);
+                    }
+    
+                    if (formattedOutput) {
+                        outputEl.innerHTML = formattedOutput.html;
+                        noteOutputs.set(currentBlockIndex, formattedOutput.html);
+                        this.codeBlockOutputs.set(note.id, noteOutputs);
+                        
+                        outputEl.addEventListener('click', async (event) => {
+                            const target = event.target;
+                            if (target.matches('.copy-output-btn')) {
+                                this.copyTextToClipboard(formattedOutput.rawText || '', target);
+                            } else if (target.matches('.copy-plot-btn')) {
+                                const base64 = target.dataset.plotBase64;
+                                try {
+                                    const blob = this.base64ToBlob(base64);
+                                    await navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
+                                    target.textContent = 'Copied!';
+                                    setTimeout(() => { target.textContent = 'Copy Image'; }, 2000);
+                                } catch (err) {
+                                    console.error('Failed to copy image:', err);
+                                    target.textContent = 'Error!';
+                                }
+                            } else if (target.matches('.download-plot-btn')) {
+                                const a = document.createElement('a');
+                                a.href = URL.createObjectURL(this.base64ToBlob(target.dataset.plotBase64));
+                                a.download = target.dataset.filename;
+                                a.click();
                             }
-                        } else if (target.matches('.download-plot-btn')) {
-                            const a = document.createElement('a');
-                            a.href = URL.createObjectURL(this.base64ToBlob(target.dataset.plotBase64));
-                            a.download = target.dataset.filename;
-                            a.click();
-                        }
-                    });
+                        });
+                    }
                 } catch (error) {
                     let errorMessage = error.message || error.toString();
                     outputEl.innerHTML = `<pre class="output-error">${this.escapeHtml(errorMessage)}</pre>`;
@@ -1046,12 +1087,18 @@ class PKMApp {
                 }
             });
         });
-
+    
         paneEl.querySelectorAll('.wikilink').forEach(link => {
             link.addEventListener('click', (e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 const noteId = link.dataset.link;
-                if (this.notes[noteId]) this.openNote(noteId);
+                const targetNote = this.notes[noteId] || Object.values(this.notes).find(n => n.title.toLowerCase() === noteId.toLowerCase());
+                if (targetNote) {
+                    this.openNote(targetNote.id);
+                } else if(noteId) { // Check if noteId is not just an empty string from a malformed link
+                    this.createNoteWithTitle(noteId);
+                }
             });
         });
     }
@@ -1420,7 +1467,7 @@ class PKMApp {
                             // Check for title in YAML frontmatter
                             const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
                             if (yamlMatch) {
-                                const titleMatch = yamlMatch[1].match(/^title:\s*(.+)$/m);
+                                const titleMatch = yamlMatch.match(/^title:\s*(.+)$/m);
                                 if (titleMatch) {
                                     title = titleMatch[1].replace(/^['"]|['"]$/g, '').trim();
                                 }
