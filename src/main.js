@@ -85,7 +85,7 @@ constructor(parent, content = '', notes = {}, openNoteCallback = null, createNot
 class PKMApp {
     constructor() {
         this.notes = this.loadNotes();
-        this.settings = storage.get('pkm_settings', { theme: 'light', skipDeleteConfirm: false });
+        this.settings = storage.get('pkm_settings', { theme: 'light', skipDeleteConfirm: false, pythonEnabled: false, rEnabled: false});
         this.sortOrder = storage.get('pkm_sort_order', 'alphabetical');
 
         // --- State for Tabbed Interface ---
@@ -100,10 +100,9 @@ class PKMApp {
         this.backlinksManager = new BacklinksManager(this.notes);
         this.graphManager = new GraphManager(this.notes);
         
-        this.pyodideManager = new PyodideManager();
-        this.webRManager = new WebRManager();
-        this.bindPyodideStatus();
-        this.bindWebRStatus(); 
+        this.pyodideManager = null;
+        this.webRManager = null;
+
   
         this.codeBlockOutputs = new Map();
         
@@ -292,7 +291,8 @@ class PKMApp {
         }
 
         this.setupTheme();
-       this.bindGlobalEvents();
+        this.bindGlobalEvents();
+        this.setupExecutionToggles();
         this.renderNoteList();
         this.loadInitialEditorState();
         this.updateRightSidebar();
@@ -467,8 +467,107 @@ class PKMApp {
             this.showContextMenu(e, { type: 'header' });
         });
         
-        // NOTE: Obsolete keyboard shortcuts related to panes have been removed.
+       
     }
+
+   setupExecutionToggles() {
+        const pythonToggle = document.getElementById('python-toggle');
+        const rToggle = document.getElementById('r-toggle');
+
+        pythonToggle.checked = this.settings.pythonEnabled;
+        rToggle.checked = this.settings.rEnabled;
+
+        if (this.settings.pythonEnabled) {
+            this.initializePyodide();
+        }
+
+        if (this.settings.rEnabled) {
+            this.initializeWebR();
+        }
+
+        pythonToggle.addEventListener('change', (e) => {
+            this.settings.pythonEnabled = e.target.checked;
+            this.saveSettings();
+            if (e.target.checked) {
+                this.initializePyodide();
+            } else {
+                // Optional: add logic here to "disable" the manager if needed
+                this.pyodideManager = null; 
+                this.updatePyodideStatus('disabled', 'Disabled');
+            }
+        });
+
+        rToggle.addEventListener('change', (e) => {
+            this.settings.rEnabled = e.target.checked;
+            this.saveSettings();
+            if (e.target.checked) {
+                this.initializeWebR();
+            } else {
+                // Optional: add logic here to "disable" the manager if needed
+                this.webRManager = null;
+                this.updateWebRStatus('disabled', 'Disabled');
+            }
+        });
+    }
+
+    /**
+     * Dynamically loads the Pyodide script and initializes the manager.
+     */
+    initializePyodide() {
+        if (this.pyodideManager || window.loadPyodide) return; // Already loading or loaded
+
+        this.updatePyodideStatus('loading', 'Loading...');
+        
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js';
+        script.onload = () => {
+            this.pyodideManager = new PyodideManager();
+            this.bindPyodideStatus();
+        };
+        script.onerror = () => {
+            this.updatePyodideStatus('error', 'Load Failed');
+        };
+        document.head.appendChild(script);
+    }
+    
+    /**
+     * Dynamically loads the webR script and initializes the manager.
+     * NOTE: You might need to adjust the script URL for webR.
+     */
+    initializeWebR() {
+        if (this.webRManager) return; // Already initialized
+
+        // webR requires a service worker and other files.
+        // Assuming your webRManager handles the setup after the main script loads.
+        this.updateWebRStatus('loading', 'Loading...');
+        
+        // This is a placeholder for the webR loading process.
+        // It's often more complex than just one script. 
+        // We will assume the webRManager can be instantiated directly
+        // and it handles its own internal loading.
+        this.webRManager = new WebRManager();
+        this.bindWebRStatus();
+    }
+
+    // Helper functions to manually update status indicators
+    updatePyodideStatus(status, message) {
+        const statusEl = document.getElementById('pyodideStatus');
+        const textEl = statusEl.querySelector('.status-text');
+        if (!statusEl || !textEl) return;
+        statusEl.className = 'pyodide-status';
+        statusEl.classList.add(status);
+        textEl.textContent = message;
+    }
+
+    updateWebRStatus(status, message) {
+        const statusEl = document.getElementById('webRStatus');
+        const textEl = statusEl.querySelector('.status-text');
+        if (!statusEl || !textEl) return;
+        statusEl.className = 'webr-status';
+        statusEl.classList.add(status);
+        textEl.textContent = message;
+    }
+
 
     loadInitialEditorState() {
         if (this.openTabs.length > 0 && this.activeTabIndex > -1) {
@@ -831,6 +930,9 @@ class PKMApp {
             <div class="status-bar"><span class="save-status">Saved</span></div>`;
     }
 
+
+
+
     bindEditorEvents() {
         const editorEl = document.querySelector('.editor-container');
         if (!editorEl) return;
@@ -1031,6 +1133,14 @@ class PKMApp {
                 }
     
                 const code = codeElement.textContent;
+                if (lang === 'python' && !this.pyodideManager) {
+                    outputEl.innerHTML = '<pre class="output-error">Python environment is not enabled. Use the 🐍 toggle to enable it.</pre>';
+                    return;
+                }
+                 if (lang === 'r' && !this.webRManager) {
+                    outputEl.innerHTML = '<pre class="output-error">R environment is not enabled. Use the ®️ toggle to enable it.</pre>';
+                    return;
+                }
                 outputEl.innerHTML = '<div class="spinner">⏳ Executing...</div>';
                 newButton.disabled = true;
                 newButton.textContent = '⏳ Running...';
