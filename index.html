@@ -6,8 +6,8 @@
     <title>PKM Notes</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
-  <script type="module" crossorigin src="/assets/index-BuFlbTPE.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-BHEAs90D.css">
+  <script type="module" crossorigin src="/assets/index-BkmiD1io.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BlFn3GDu.css">
 </head>
 <body>
     <div class="app">
@@ -26,14 +26,30 @@
             <input type="text" class="search-input" placeholder="Search notes..." id="searchInput">
             
             <div class="header-actions">
+                
+                <div class="toggle-control">
+    <span class="toggle-label">🐍 Py</span>
+    <label class="switch">
+        <input type="checkbox" id="python-toggle">
+        <span class="slider"></span>
+    </label>
+</div>
+<div class="toggle-control">
+    <span class="toggle-label">®️ R</span>
+    <label class="switch">
+        <input type="checkbox" id="r-toggle">
+        <span class="slider"></span>
+    </label>
+</div>
+                
+
                 <div class="pyodide-status" id="pyodideStatus" title="Python environment status">
                     <span class="status-icon">🐍</span>
-                    <span class="status-text">Loading...</span>
+                    <span class="status-text">Disabled</span>
                 </div>
-                <!-- ADD THE R STATUS INDICATOR HERE -->
                 <div class="webr-status" id="webRStatus" title="R environment status">
                     <span class="status-icon">®️</span>
-                    <span class="status-text">Loading...</span>
+                    <span class="status-text">Disabled</span>
                 </div>
                 <button class="btn" id="themeBtn">🌓</button>
                 <button class="btn" id="importBtn">Import</button>
@@ -48,6 +64,16 @@
                     A home cooked app by <a href="https://shawngraham.github.io" target="_blank" rel="noopener noreferrer">S.M. Graham</a>
                 </div>
             </div>
+        <div class="status-indicators">
+    <div class="pyodide-status" id="pyodideStatus">
+        <div class="status-indicator"></div>
+        <span class="status-text"></span>
+    </div>
+    <div class="webr-status" id="webRStatus">
+        <div class="status-indicator"></div>
+        <span class="status-text"></span>
+    </div>
+</div>
         </header>
         
         <main class="main">
@@ -76,7 +102,8 @@
     <input type="file" id="fileInput" multiple accept=".md,.txt" class="hidden">
     
     <!-- External dependencies loaded via CDN -->
-    <script defer src="https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js"></script>
+    <!-- DELETED: The pyodide script is now loaded dynamically -->
+    <!-- <script defer src="https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js"></script> -->
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.1/markdown-it.min.js"></script>
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.5/purify.min.js"></script>
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
